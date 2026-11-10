@@ -4,10 +4,10 @@ import pytest
 
 from data.run_repo import Caller, RunRepo, decode_cursor
 from errors import ConflictError, NotFoundError, ValidationFailed
-from schemas import RunStatus
+from schemas import Run, RunStatus
 
 
-def make(repo: RunRepo, login: str = "alice", inst: int = 1, n: int = 1):
+def make(repo: RunRepo, login: str = "alice", inst: int = 1, n: int = 1) -> Run:
     return repo.create(installation_id=inst, repository_full_name="o/r", issue_number=n,
                        issue_title="t", issue_body="b", triggered_by=login)
 
