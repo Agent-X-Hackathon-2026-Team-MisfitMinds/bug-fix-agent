@@ -1,18 +1,19 @@
-"""GitHub webhook handling: signature verification and delivery dedup."""
+"""GitHub webhook handling: signature, dedup and run creation."""
 import hashlib
 import hmac
-import os
-from typing import Any
+from typing import Any, cast
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from pydantic import ValidationError
 
+from config import get_settings
+from data.run_repo import RunRepo
+from data.webhook_repo import DeliveryStore
 from errors import AppError, ConflictError, Unauthorized, ValidationFailed
+from rate_limit import rate_limit
 from schemas import GitHubWebhookPayload
 
 router = APIRouter()
-
-_processed_deliveries: set[str] = set()
 
 
 def verify_webhook_signature(payload: bytes, signature: str, secret: str) -> bool:
@@ -23,7 +24,7 @@ def verify_webhook_signature(payload: bytes, signature: str, secret: str) -> boo
 
 
 def _webhook_secret() -> str:
-    secret = os.getenv("GITHUB_APP_WEBHOOK_SECRET") or os.getenv("GITHUB_WEBHOOK_SECRET")
+    secret = get_settings().github_webhook_secret.get_secret_value()
     if not secret:
         raise AppError("Webhook secret is not configured")
     return secret
@@ -36,22 +37,37 @@ def is_agent_fix_labeled(payload: GitHubWebhookPayload) -> bool:
     return any(str(label.get("name", "")).lower() == "agent-fix" for label in labels)
 
 
+def _as_int(value: Any) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
 def extract_run_fields(payload: GitHubWebhookPayload) -> dict[str, Any] | None:
     issue = payload.issue
     if issue is None or not is_agent_fix_labeled(payload):
         return None
     repository = payload.repository
     return {
-        "installation_id": int((payload.installation or {}).get("id") or 0),
+        "installation_id": _as_int((payload.installation or {}).get("id")),
         "repository_full_name": str(repository.get("full_name", "")),
-        "issue_number": int(issue.get("number", 0)),
+        "issue_number": _as_int(issue.get("number")),
         "issue_title": str(issue.get("title", "")),
         "issue_body": str(issue.get("body") or ""),
         "triggered_by": str(payload.sender.get("login", "")),
     }
 
 
-@router.post("/github")
+def _get_repo(request: Request) -> RunRepo:
+    return cast(RunRepo, request.app.state.run_repo)
+
+
+def _get_deliveries(request: Request) -> DeliveryStore:
+    return cast(DeliveryStore, request.app.state.webhook_deliveries)
+
+
+@router.post("/github", dependencies=[Depends(rate_limit("webhook", 100))])
 async def github_webhook(request: Request) -> dict[str, str]:
     delivery_id = request.headers.get("X-GitHub-Delivery")
     signature = request.headers.get("X-Hub-Signature-256")
@@ -63,14 +79,28 @@ async def github_webhook(request: Request) -> dict[str, str]:
     if not verify_webhook_signature(body, signature, _webhook_secret()):
         raise Unauthorized("Invalid webhook signature")
 
-    if delivery_id in _processed_deliveries:
-        raise ConflictError("Duplicate webhook delivery")
-    _processed_deliveries.add(delivery_id)
-
     try:
         payload = GitHubWebhookPayload.model_validate_json(body)
     except ValidationError as exc:
         raise ValidationFailed("Invalid webhook payload") from exc
 
-    extract_run_fields(payload)
+    fields = extract_run_fields(payload)
+    if fields is not None:
+        if (
+            fields["installation_id"] <= 0
+            or not fields["repository_full_name"]
+            or fields["issue_number"] <= 0
+            or not fields["triggered_by"]
+        ):
+            raise ValidationFailed("Webhook payload is missing run fields")
+
+    if not _get_deliveries(request).check_and_add(delivery_id):
+        raise ConflictError("Duplicate webhook delivery")
+
+    if fields is not None:
+        run = _get_repo(request).create(**fields)
+        queue = getattr(request.app.state, "pipeline_queue", None)
+        if callable(queue):
+            queue(run.id)
+
     return {"status": "accepted", "delivery_id": delivery_id}

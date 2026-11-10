@@ -5,6 +5,7 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
+from data.run_repo import Caller, RunRepo
 from main import app
 from schemas import GitHubWebhookPayload
 from webhooks.github import extract_run_fields, verify_webhook_signature
@@ -67,6 +68,31 @@ def test_valid_delivery_accepted(monkeypatch: Any) -> None:
     response = post(payload(), delivery="delivery-ok")
     assert response.status_code == 200
     assert response.json() == {"status": "accepted", "delivery_id": "delivery-ok"}
+
+    repo: RunRepo = app.state.run_repo
+    runs, _ = repo.list(Caller(123, "octocat"))
+    assert len(runs) == 1
+    assert runs[0].issue_number == 1
+    assert runs[0].repository_full_name == "fixie-demo/seeded-repo"
+
+
+def test_non_agent_fix_label_does_not_create_run(monkeypatch: Any) -> None:
+    monkeypatch.setenv("GITHUB_APP_WEBHOOK_SECRET", SECRET)
+    response = post(payload(labels=["bug"]), delivery="delivery-other")
+    assert response.status_code == 200
+
+    repo: RunRepo = app.state.run_repo
+    runs, _ = repo.list(Caller(123, "octocat"))
+    assert runs == []
+
+
+def test_missing_installation_is_rejected(monkeypatch: Any) -> None:
+    monkeypatch.setenv("GITHUB_APP_WEBHOOK_SECRET", SECRET)
+    body = payload()
+    body.pop("installation")
+    response = post(body, delivery="delivery-no-install")
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
 def test_duplicate_delivery_returns_409(monkeypatch: Any) -> None:

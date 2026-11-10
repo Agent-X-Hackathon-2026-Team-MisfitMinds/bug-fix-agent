@@ -7,6 +7,7 @@ from auth.sessions import SessionRepo
 from config import get_settings
 from data.idempotency import IdempotencyStore
 from data.run_repo import RunRepo
+from data.webhook_repo import DeliveryStore
 from main import app
 from rate_limit import RateLimiter
 
@@ -17,6 +18,8 @@ def reset_app_state() -> Iterator[None]:
     app.state.sessions = SessionRepo()
     app.state.run_repo = RunRepo()
     app.state.idempotency = IdempotencyStore()
+    app.state.webhook_deliveries = DeliveryStore()
+    app.state.pipeline_queue = None
     app.state.rate_limiter = RateLimiter()
     app.state.oauth_client = None
     yield
