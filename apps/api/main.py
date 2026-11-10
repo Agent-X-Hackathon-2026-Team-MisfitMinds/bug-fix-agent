@@ -1,6 +1,8 @@
-"""Main FastAPI application for the bug-fix agent."""
+﻿"""Main FastAPI application for the bug-fix agent."""
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
+
+from errors import register_error_handlers, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from .schemas import *
 from .webhooks.github import router as github_router
