@@ -23,7 +23,6 @@ pytest_cache/
 .env.*.local
 
 # Docker
-.dockerignore
 
 # Reports and logs
 coverage/
@@ -42,7 +41,7 @@ test-results/
 .Library/
 
 # Sprint-specific
-apps/api/data/*.json !apps/api/data/.gitkeep.env.*
+.env.*
 !.env.example
 .pytest_cache/
 .mypy_cache/

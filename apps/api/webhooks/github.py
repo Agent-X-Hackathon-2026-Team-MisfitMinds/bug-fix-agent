@@ -1,58 +1,76 @@
-"""GitHub webhook handler helpers for the bug-fix agent."""
-
+"""GitHub webhook handling: signature verification and delivery dedup."""
 import hashlib
 import hmac
+import os
 from typing import Any
 
+from fastapi import APIRouter, Request
+from pydantic import ValidationError
+
+from errors import AppError, ConflictError, Unauthorized, ValidationFailed
 from schemas import GitHubWebhookPayload
 
+router = APIRouter()
 
-def verify_webhook_signature(
-    payload: bytes,
-    signature: str,
-    secret: str,
-) -> bool:
-    """Verify GitHub webhook signature using HMAC-SHA256."""
+_processed_deliveries: set[str] = set()
+
+
+def verify_webhook_signature(payload: bytes, signature: str, secret: str) -> bool:
     if not signature.startswith("sha256="):
         return False
-
-    expected_hmac = signature[len("sha256="):]
-    computed_hmac = hmac.new(
-        secret.encode("utf-8"),
-        payload,
-        hashlib.sha256,
-    ).hexdigest()
-
-    return hmac.compare_digest(expected_hmac, computed_hmac)
+    expected = hmac.new(secret.encode("utf-8"), payload, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, signature[len("sha256="):])
 
 
-class GitHubWebhookHandler:
-    """Handler for GitHub webhook events."""
+def _webhook_secret() -> str:
+    secret = os.getenv("GITHUB_APP_WEBHOOK_SECRET") or os.getenv("GITHUB_WEBHOOK_SECRET")
+    if not secret:
+        raise AppError("Webhook secret is not configured")
+    return secret
 
-    def __init__(self, webhook_secret: str) -> None:
-        self.webhook_secret = webhook_secret
 
-    def verify_delivery(self, delivery_id: str, x_github_event: str) -> bool:
-        """Check whether a delivery was already processed."""
-        return True
+def is_agent_fix_labeled(payload: GitHubWebhookPayload) -> bool:
+    if payload.action != "labeled" or payload.issue is None:
+        return False
+    labels = payload.issue.get("labels", [])
+    return any(str(label.get("name", "")).lower() == "agent-fix" for label in labels)
 
-    async def handle_issues_labeled(
-        self, payload: GitHubWebhookPayload
-    ) -> dict[str, Any] | None:
-        """Handle issues.labeled events with the agent-fix label."""
-        issue = payload.issue
-        if not issue:
-            return None
 
-        labels = [label.get("name", "").lower() for label in issue.get("labels", [])]
-        if "agent-fix" not in labels:
-            return None
+def extract_run_fields(payload: GitHubWebhookPayload) -> dict[str, Any] | None:
+    issue = payload.issue
+    if issue is None or not is_agent_fix_labeled(payload):
+        return None
+    repository = payload.repository
+    return {
+        "installation_id": int((payload.installation or {}).get("id") or 0),
+        "repository_full_name": str(repository.get("full_name", "")),
+        "issue_number": int(issue.get("number", 0)),
+        "issue_title": str(issue.get("title", "")),
+        "issue_body": str(issue.get("body") or ""),
+        "triggered_by": str(payload.sender.get("login", "")),
+    }
 
-        return {
-            "issue_number": issue.get("number"),
-            "issue_title": issue.get("title"),
-            "issue_body": issue.get("body"),
-            "repo_full_name": payload.repository.get("full_name"),
-            "repo_owner": payload.repository.get("owner", {}).get("login"),
-            "action": payload.action,
-        }
+
+@router.post("/github")
+async def github_webhook(request: Request) -> dict[str, str]:
+    delivery_id = request.headers.get("X-GitHub-Delivery")
+    signature = request.headers.get("X-Hub-Signature-256")
+    event = request.headers.get("X-GitHub-Event")
+    if not delivery_id or not signature or not event:
+        raise ValidationFailed("Missing required webhook headers")
+
+    body = await request.body()
+    if not verify_webhook_signature(body, signature, _webhook_secret()):
+        raise Unauthorized("Invalid webhook signature")
+
+    if delivery_id in _processed_deliveries:
+        raise ConflictError("Duplicate webhook delivery")
+    _processed_deliveries.add(delivery_id)
+
+    try:
+        payload = GitHubWebhookPayload.model_validate_json(body)
+    except ValidationError as exc:
+        raise ValidationFailed("Invalid webhook payload") from exc
+
+    extract_run_fields(payload)
+    return {"status": "accepted", "delivery_id": delivery_id}
