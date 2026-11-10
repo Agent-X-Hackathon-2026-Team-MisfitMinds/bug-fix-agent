@@ -1,0 +1,2 @@
+# Seeded demo repository — Python standard library only.
+# No external dependencies required for the buggy functions or tests.
