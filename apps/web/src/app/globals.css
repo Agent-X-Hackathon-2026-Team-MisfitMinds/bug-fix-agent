@@ -50,3 +50,6 @@
   .sidebar-nav a{min-height:44px}
   .sidebar-bottom .sidebar-action{width:44px;min-width:44px;min-height:44px;justify-content:center;padding:0}
 }
+
+/* Reusable action focus and touch target. */
+.ui-button{min-width:44px;min-height:44px}.ui-button:focus-visible{outline:2px solid var(--ds-border-focus,var(--ds-brand));outline-offset:2px}
