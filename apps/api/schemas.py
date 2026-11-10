@@ -134,3 +134,167 @@ class GitHubWebhookPayload(BaseModel):
 class SSEEvent(BaseModel):
     event: str
     data: dict[str, Any]
+
+
+# ------------------------------------------------------------
+# LangGraph Run State - must match TS types in packages/shared/types.ts
+# ------------------------------------------------------------
+
+
+class RunStatus(str, Enum):
+    """Current run status - must match TS RunStatus.
+
+    Required values: pending, reproducing, fixing, verifying,
+    completed, failed, could_not_reproduce
+    """
+    pending = "pending"
+    reproducing = "reproducing"
+    fixing = "fixing"
+    verifying = "verifying"
+    completed = "completed"
+    failed = "failed"
+    could_not_reproduce = "could_not_reproduce"
+
+
+class ConfidenceLevel(str, Enum):
+    """Confidence level in the result - must match TS ConfidenceLevel."""
+    high = "high"
+    medium = "medium"
+    low = "low"
+
+
+class PipelineStep(str, Enum):
+    """Current pipeline step - must match TS PipelineStep.
+
+    Required values: read, reproduce, diagnose, fix, verify, pr
+    """
+    read = "read"
+    reproduce = "reproduce"
+    diagnose = "diagnose"
+    fix = "fix"
+    verify = "verify"
+    pr = "pr"
+
+
+class RunState(BaseModel):
+    """Typed graph state shared across all pipeline nodes.
+
+    Kept in sync with packages/shared/types.ts:
+    - status: RunStatus enum
+    - confidence: ConfidenceLevel enum
+    - step: PipelineStep enum
+    """
+
+    # Identification
+    run_id: str = Field(
+        default_factory=lambda: f"run-{__import__('hashlib').sha256(
+            __import__('uuid').uuid4().encode
+        ).hexdigest()[:12]}"
+    )
+    issue_id: int = Field(..., description="GitHub issue number")
+    repo_name: str = Field(..., description="Repository in owner/name format")
+    branch: str = Field(
+        default="agent-fix",
+        description="Working branch name",
+    )
+
+    # Status & Step Tracking
+    status: RunStatus = Field(
+        default=RunStatus.pending,
+        description="Current run status",
+    )
+    step: PipelineStep = Field(
+        default=PipelineStep.read,
+        description="Current pipeline step",
+    )
+    confidence: Optional[ConfidenceLevel] = Field(
+        default=None,
+        description="Confidence in current result: high/medium/low",
+    )
+
+    # Issue Details
+    issue_title: Optional[str] = Field(
+        default=None,
+        description="Issue title from GitHub",
+    )
+    issue_body: Optional[str] = Field(
+        default=None,
+        description="Issue body/description",
+    )
+    reproduction_steps: Optional[str] = Field(
+        default=None,
+        description="Extracted reproduction steps from issue",
+    )
+
+    # Before Fix Evidence
+    before_test_output: Optional[str] = Field(
+        default=None,
+        description="Test output before the fix was applied",
+    )
+    before_exit_code: Optional[int] = Field(
+        default=None,
+        description="Exit code before the fix",
+    )
+
+    # After Fix Evidence
+    after_test_output: Optional[str] = Field(
+        default=None,
+        description="Test output after the fix was applied",
+    )
+    after_exit_code: Optional[int] = Field(
+        default=None,
+        description="Exit code after the fix",
+    )
+
+    # Root Cause & Patch
+    root_cause: Optional[str] = Field(
+        default=None,
+        description="Plain-English root cause diagnosis",
+    )
+    patch: Optional[dict[str, str]] = Field(
+        default=None,
+        description="Applied patch: {file_path, old_code, new_code, description}",
+    )
+    likely_file: Optional[str] = Field(
+        default=None,
+        description="Likely file containing the bug",
+    )
+    likely_line: Optional[int] = Field(
+        default=None,
+        description="Likely line number containing the bug",
+    )
+
+    # Evidence & Errors
+    evidence: list[str] = Field(
+        default_factory=list,
+        description="Supporting evidence for root cause",
+    )
+    errors: list[str] = Field(
+        default_factory=list,
+        description="Error messages encountered during run",
+    )
+
+    # PR & Branch Information
+    pr_url: Optional[str] = Field(
+        default=None,
+        description="Draft PR URL if opened",
+    )
+    branch_name: Optional[str] = Field(
+        default=None,
+        description="Git branch name where patch was applied",
+    )
+
+    # Metadata
+    retry_count: int = Field(
+        default=0,
+        description="Number of retry attempts for this run",
+    )
+    created_at: str = Field(
+        default_factory=lambda: __import__('datetime').datetime.utcnow().isoformat()
+        + "Z",
+        description="ISO timestamp when run was created",
+    )
+    updated_at: str = Field(
+        default_factory=lambda: __import__('datetime').utcnow().isoformat() + "Z",
+        description="ISO timestamp when run was last updated",
+    )
