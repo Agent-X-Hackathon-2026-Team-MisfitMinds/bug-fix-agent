@@ -47,6 +47,9 @@ jobs:
       - name: G6 - pytest unit
         run: python -m pytest tests/unit -q
 
+      - name: G7 - pytest integration
+        run: python -m pytest tests/integration -v
+
   audit:
     name: G13 - dependency audit (advisory)
     runs-on: ubuntu-latest
