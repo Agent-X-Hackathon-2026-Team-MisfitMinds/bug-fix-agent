@@ -3,6 +3,8 @@ services:
     build: ./apps/api
     ports:
       - "8000:8000"
+    volumes:
+      - ./apps/api/data:/app/data
     environment:
       - GITHUB_APP_ID=${GITHUB_APP_ID}
       - GITHUB_APP_CLIENT_ID=${GITHUB_APP_CLIENT_ID}
