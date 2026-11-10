@@ -6,7 +6,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from auth.router import router as auth_router
 from auth.sessions import SessionRepo
 from config import get_settings
+from data.idempotency import IdempotencyStore
+from data.run_repo import RunRepo
 from errors import register_error_handlers
+from rate_limit import RateLimiter
+from routes.runs import router as runs_router
 from webhooks.github import router as github_router
 
 settings = get_settings()
@@ -26,10 +30,14 @@ app.add_middleware(
 )
 
 app.state.sessions = SessionRepo()
+app.state.run_repo = RunRepo()
+app.state.idempotency = IdempotencyStore()
+app.state.rate_limiter = RateLimiter()
 app.state.oauth_client = None
 
 register_error_handlers(app)
 app.include_router(auth_router, tags=["auth"])
+app.include_router(runs_router, tags=["runs"])
 app.include_router(github_router, prefix="/webhooks", tags=["webhooks"])
 
 
