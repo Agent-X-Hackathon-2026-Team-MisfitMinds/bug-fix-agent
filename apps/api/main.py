@@ -1,9 +1,7 @@
 """Main FastAPI application for the bug-fix agent."""
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .schemas import *
-from .webhooks.github import router as github_router
 
 app = FastAPI(
     title="Bug-Fix Agent API",
@@ -16,24 +14,12 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "Idempotency-Key"],
 )
-
-# Include routers
-app.include_router(github_router, prefix="/webhooks", tags=["webhooks"])
 
 
 @app.get("/health", tags=["root"])
-async def health_check():
+async def health_check() -> dict[str, str]:
     """Health check endpoint."""
-    return {"status": "healthy", "service": "bug-fix-agent-api"}
-
-
-@app.get("/docs", tags=["root"])
-async def api_docs():
-    """API documentation endpoint."""
-    return {
-        "message": "See /docs for full OpenAPI specification",
-        "endpoints": ["/health", "/webhooks/github", "/runs"],
-    }
+    return {"status": "ok"}
