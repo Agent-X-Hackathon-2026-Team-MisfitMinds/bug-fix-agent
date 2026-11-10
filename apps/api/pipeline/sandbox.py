@@ -85,6 +85,20 @@ def _cli_env() -> dict[str, str]:
     }
 
 
+def _force_remove(container_name: str) -> None:
+    try:
+        subprocess.run(
+            ["docker", "rm", "-f", container_name],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+            env=_cli_env(),
+        )
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+
 def _as_text(value: str | bytes | None) -> str:
     if value is None:
         return ""
@@ -111,6 +125,8 @@ def run_sandbox(
     try:
         completed = execute(cmd, **kwargs)
     except subprocess.TimeoutExpired as exc:
+        if runner is None:
+            _force_remove(container_name)
         return SandboxResult(
             exit_code=124,
             stdout=_as_text(exc.stdout),
