@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   api:
-    name: Lint, types and unit tests
+    name: Lint, types, unit and integration tests
     runs-on: ubuntu-latest
     defaults:
       run:
