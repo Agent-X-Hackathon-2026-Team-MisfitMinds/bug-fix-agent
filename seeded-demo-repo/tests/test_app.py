@@ -36,3 +36,13 @@ def test_get_user_profile_returns_none_for_unknown_user():
     """
     result = get_user_profile(999)
     assert result is None, f"Expected None, got {result}"
+
+
+def test_get_user_profile_returns_profile_for_known_user():
+    """Known user should return a profile dict, not crash.
+
+    Verifies the function works for valid users after the null-check fix.
+    """
+    result = get_user_profile(1)
+    assert result is not None, "Known user should return a profile"
+    assert result == {"name": "Alice", "id": 1}, f"Expected profile dict, got {result}"
