@@ -1,0 +1,23 @@
+services:
+  api:
+    build: ./apps/api
+    ports:
+      - "8000:8000"
+    environment:
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+      - GITHUB_APP_ID=${GITHUB_APP_ID}
+    volumes:
+      - .:/bug-fix-agent:ro
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_SITE_URL=http://localhost:3000
+      - API_BASE_URL=http://api:8000
+    depends_on:
+      - api

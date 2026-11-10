@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Bug-Fix Agent Run Contract",
+  "type": "object",
+  "required": ["runId", "status", "step", "confidence"],
+  "properties": {
+    "runId": {
+      "type": "string",
+      "description": "Unique identifier for this run"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "reproducing", "fixing", "verifying", "completed", "failed", "could_not_reproduce"],
+      "description": "Current run status"
+    },
+    "step": {
+      "type": "string",
+      "enum": ["read", "reproduce", "diagnose", "fix", "verify", "pr"],
+      "description": "Current pipeline step"
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["high", "medium", "low"],
+      "description": "Confidence in the result"
+    },
+    "issueId": {
+      "type": "string",
+      "description": "GitHub issue ID"
+    },
+    "repoName": {
+      "type": "string",
+      "description": "Repository name"
+    },
+    "branch": {
+      "type": "string",
+      "description": "Working branch name"
+    },
+    "error": {
+      "type": "string",
+      "description": "Error message if any"
+    },
+    "patch": {
+      "type": "string",
+      "description": "Code patch applied"
+    },
+    "beforeTestOutput": {
+      "type": "string",
+      "description": "Test output before the fix"
+    },
+    "afterTestOutput": {
+      "type": "string",
+      "description": "Test output after the fix"
+    }
+  }
+}

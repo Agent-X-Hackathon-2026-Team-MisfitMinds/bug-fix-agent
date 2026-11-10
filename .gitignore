@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+.pnpm-lock.yaml
+yarn-lock.lock
+package-lock-lock.json
+
+# Next.js
+.next/
+/dist/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+pytest_cache/
+.coverage
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Docker
+.dockerignore
+
+# Reports and logs
+coverage/
+playwright-report/
+test-results/
+.lighthouseci/
+
+# IDE
+.vscode/
+.idea/
+*.filters
+*.db
+
+# OS
+.DS_Store
+.Library/
+
+# Sprint-specific
+apps/api/data/*.json !apps/api/data/.gitkeep
