@@ -3,7 +3,7 @@ import hmac
 from typing import Any, cast
 
 import httpx
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from auth.crypto import encrypt_token
@@ -19,6 +19,7 @@ from auth.oauth import (
 from auth.sessions import Session
 from config import Settings, get_settings
 from errors import Unauthorized
+from rate_limit import rate_limit
 from schemas import LogoutResponse, SessionInfo
 
 router = APIRouter()
@@ -122,7 +123,12 @@ async def oauth_callback(
     return _finish_response(settings, session)
 
 
-@router.get("/auth/session", response_model=SessionInfo, response_model_exclude_none=True)
+@router.get(
+    "/auth/session",
+    response_model=SessionInfo,
+    response_model_exclude_none=True,
+    dependencies=[Depends(rate_limit("auth-session", 60))],
+)
 async def session_info(request: Request) -> SessionInfo:
     session = optional_auth(request)
     if session is None:
@@ -134,7 +140,11 @@ async def session_info(request: Request) -> SessionInfo:
     )
 
 
-@router.post("/auth/logout", response_model=LogoutResponse)
+@router.post(
+    "/auth/logout",
+    response_model=LogoutResponse,
+    dependencies=[Depends(rate_limit("auth-logout", 30))],
+)
 async def logout(request: Request) -> Response:
     settings = get_settings()
     session_id = request.cookies.get(SESSION_COOKIE)

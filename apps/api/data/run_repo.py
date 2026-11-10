@@ -102,6 +102,18 @@ class RunRepo:
             raise ConflictError("This run cannot be retried in its current state")
         return run
 
+    def reset_for_retry(self, run_id: UUID) -> Run:
+        run = self._runs.get(run_id)
+        if run is None:
+            raise NotFoundError("Run not found")
+        data = run.model_dump()
+        data.update(status=RunStatus.pending, updated_at=_now(), completed_at=None,
+                    confidence=None, pr_url=None, pr_number=None)
+        updated = Run(**data)
+        self._runs[run_id] = updated
+        self._steps[run_id] = []
+        return updated
+
     def delete_all_for_user(self, github_login: str) -> int:
         ids = [i for i, r in self._runs.items() if r.triggered_by == github_login]
         for i in ids:
