@@ -45,3 +45,8 @@
 
 /* Loading placeholders for the real dashboard and run detail. */
 .state-skeleton{display:grid;gap:10px;margin-top:14px}.state-skeleton span{display:block;height:14px;border-radius:8px;background:var(--ds-border);opacity:.55}.state-skeleton span:nth-child(2){width:80%}.state-skeleton span:nth-child(3){width:60%}
+/* Keep mobile navigation and icon-only actions comfortably tappable. */
+@media(max-width:800px){
+  .sidebar-nav a{min-height:44px}
+  .sidebar-bottom .sidebar-action{width:44px;min-width:44px;min-height:44px;justify-content:center;padding:0}
+}
