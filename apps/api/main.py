@@ -1,12 +1,15 @@
 """Main FastAPI application for the bug-fix agent."""
 
-import os
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from auth.router import router as auth_router
+from auth.sessions import SessionRepo
+from config import get_settings
 from errors import register_error_handlers
 from webhooks.github import router as github_router
+
+settings = get_settings()
 
 app = FastAPI(
     title="Bug-Fix Agent API",
@@ -16,13 +19,17 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[os.getenv("WEB_ORIGIN", "http://localhost:3000")],
+    allow_origins=[settings.web_origin],
     allow_credentials=True,
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type", "Idempotency-Key"],
 )
 
+app.state.sessions = SessionRepo()
+app.state.oauth_client = None
+
 register_error_handlers(app)
+app.include_router(auth_router, tags=["auth"])
 app.include_router(github_router, prefix="/webhooks", tags=["webhooks"])
 
 
