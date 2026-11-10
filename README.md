@@ -42,6 +42,10 @@ docs/                product, architecture, security and quality specs
 
 ## Configuration
 
+The server reads a `.env` from the **process working directory**. Running uvicorn
+from the repo root (as shown below) means the root `.env` is the one that applies;
+if you start it from `apps/api` instead, copy the file to `apps/api/.env`.
+
 ```bash
 cp .env.example .env   # then fill in real values; .env is git-ignored
 ```
@@ -52,17 +56,21 @@ The server reads `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_CLIENT_SECRET`,
 (`GITHUB_CLIENT_ID`, `GITHUB_WEBHOOK_SECRET`, ...). Blank values fall back to the
 development defaults, so an unset variable never crashes the process.
 
-Set `COOKIE_SECURE=false` only when testing over plain HTTP on localhost.
+Leave `COOKIE_SECURE=true`. The session cookie is `__Host-session_id`, and browsers
+reject `__Host-` cookies that lack the `Secure` attribute; Chrome accepts them over
+http://localhost, but any other host needs HTTPS.
 
 ## Run the API
 
 ```bash
-cd apps/api
 python -m venv .venv
 .venv/Scripts/activate          # Windows; use source .venv/bin/activate elsewhere
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
+pip install -r apps/api/requirements.txt
+python -m uvicorn --app-dir apps/api main:app --reload --port 8000
 ```
+
+`--app-dir` puts `apps/api` on `sys.path` without changing the working directory, so
+the root `.env` is picked up.
 
 ```bash
 curl localhost:8000/health      # {"status":"ok"}
