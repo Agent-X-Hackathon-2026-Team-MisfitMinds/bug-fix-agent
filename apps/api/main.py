@@ -8,6 +8,7 @@ from auth.sessions import SessionRepo
 from config import get_settings
 from data.idempotency import IdempotencyStore
 from data.run_repo import RunRepo
+from data.webhook_repo import DeliveryStore
 from errors import register_error_handlers
 from rate_limit import RateLimiter
 from routes.runs import router as runs_router
@@ -32,6 +33,8 @@ app.add_middleware(
 app.state.sessions = SessionRepo()
 app.state.run_repo = RunRepo()
 app.state.idempotency = IdempotencyStore()
+app.state.webhook_deliveries = DeliveryStore()
+app.state.pipeline_queue = None
 app.state.rate_limiter = RateLimiter()
 app.state.oauth_client = None
 
