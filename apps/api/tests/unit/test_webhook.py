@@ -104,6 +104,19 @@ def test_duplicate_delivery_returns_409(monkeypatch: Any) -> None:
     assert second.json()["error"]["code"] == "CONFLICT"
 
 
+def test_missing_secret_fails_closed(monkeypatch: Any) -> None:
+    monkeypatch.delenv("GITHUB_APP_WEBHOOK_SECRET", raising=False)
+    monkeypatch.delenv("GITHUB_WEBHOOK_SECRET", raising=False)
+
+    response = post(payload(), delivery="delivery-no-secret")
+
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "INTERNAL_ERROR"
+    repo: RunRepo = app.state.run_repo
+    runs, _ = repo.list(Caller(123, "octocat"))
+    assert runs == []
+
+
 def test_extract_only_agent_fix_labeled() -> None:
     agent_fix = GitHubWebhookPayload.model_validate(payload())
     assert extract_run_fields(agent_fix) == {
