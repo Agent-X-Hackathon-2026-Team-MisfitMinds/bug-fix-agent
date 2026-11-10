@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   api:
-    name: Lint, types and unit tests
+    name: Lint, types, unit and integration tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -46,6 +46,9 @@ jobs:
 
       - name: G6 - pytest unit
         run: python -m pytest tests/unit -q
+
+      - name: G7 - pytest integration
+        run: python -m pytest tests/integration -v
 
   audit:
     name: G13 - dependency audit (advisory)
