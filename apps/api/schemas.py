@@ -1,16 +1,21 @@
-"""Pydantic schemas and request/response types for the bug-fix agent API."""
+"""Pydantic contracts for the bug-fix agent API.
+
+Field names and enum values mirror `packages/shared/types.ts` and the
+logical schema in `docs/06-data-api.md`.
+"""
+from datetime import datetime, timezone
+from enum import Enum
+from typing import Any, Optional
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any, List
-from enum import Enum
 
 
-# ============================================================================
-# Run State Contract - must match TS types in packages/shared/
-# ============================================================================
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
 
 class RunStatus(str, Enum):
-    """Current run status - must match TS RunStatus."""
     pending = "pending"
     reproducing = "reproducing"
     fixing = "fixing"
@@ -21,14 +26,12 @@ class RunStatus(str, Enum):
 
 
 class ConfidenceLevel(str, Enum):
-    """Confidence level in the result."""
     high = "high"
     medium = "medium"
     low = "low"
 
 
 class PipelineStep(str, Enum):
-    """Current pipeline step - must match TS PipelineStep."""
     read = "read"
     reproduce = "reproduce"
     diagnose = "diagnose"
@@ -37,151 +40,226 @@ class PipelineStep(str, Enum):
     pr = "pr"
 
 
-# Run payload models
-
-class RunCreate(BaseModel):
-    """Create a new run record."""
-    issue_id: int = Field(..., description="GitHub issue number")
-    repo_name: str = Field(..., description="Repository name in owner/name format")
-    branch: str = Field(default="agent-fix", description="Working branch name")
+class StepStatus(str, Enum):
+    pending = "pending"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
 
 
-class RunResponse(BaseModel):
-    """Response returned when creating/retrieving a run."""
-    run_id: str = Field(..., description="Unique run identifier")
-    status: RunStatus = Field(..., description="Current run status")
-    step: PipelineStep = Field(..., description="Current pipeline step")
-    confidence: Optional[ConfidenceLevel] = Field(
-        default=None, 
-        description="Confidence in current result"
-    )
-    issue_id: int = Field(..., description="GitHub issue number")
-    repo_name: str = Field(..., description="Repository name")
-    branch: str = Field(..., description="Working branch name")
-    created_at: str = Field(..., description="ISO timestamp")
-    updated_at: str = Field(..., description="ISO timestamp")
+class RunStep(BaseModel):
+    id: UUID = Field(default_factory=uuid4)
+    run_id: UUID
+    step: PipelineStep
+    status: StepStatus = StepStatus.pending
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    output: str | None = None
+    error: str | None = None
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
 
 
-# Issue models
-
-class IssueSummary(BaseModel):
-    """Summary of a GitHub issue."""
-    issue_id: int = Field(..., description="GitHub issue number")
-    title: str = Field(..., description="Issue title")
-    body: str = Field(..., description="Issue body/description")
-    labels: List[str] = Field(
-        default_factory=list, 
-        description="Issue labels"
-    )
-    repository: str = Field(
-        ..., 
-        description="Repository in owner/name format"
-    )
-
-
-# GitHub webhook models
-
-class GitHubWebhookPayload(BaseModel):
-    """GitHub webhook payload (simplified)."""
-    action: str
-    issue: Optional[Dict[str, Any]] = Field(
-        default=None, 
-        description="Issue object from webhook"
-    )
-    repository: Dict[str, Any] = Field(
-        ..., 
-        description="Repository object from webhook"
-    )
-    sender: Dict[str, Any] = Field(
-        ..., 
-        description="Sender object from webhook"
-    )
-    delivery_id: str = Field(
-        ..., 
-        description="GitHub delivery ID for dedup"
-    )
+class Run(BaseModel):
+    id: UUID = Field(default_factory=uuid4)
+    installation_id: int
+    repository_full_name: str
+    issue_number: int
+    issue_title: str
+    issue_body: str
+    status: RunStatus = RunStatus.pending
+    confidence: ConfidenceLevel | None = None
+    pr_url: str | None = None
+    pr_number: int | None = None
+    test_output: str | None = None
+    root_cause: str | None = None
+    repo_language: str = "python"
+    triggered_by: str
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
+    completed_at: datetime | None = None
 
 
-# API error model
-
-class ApiError(BaseModel):
-    """Standard API error response."""
-    detail: str = Field(..., description="Human-readable error message")
-    code: str = Field(
-        default="api_error", 
-        description="Machine-readable error code"
-    )
-    status_code: int = Field(
-        default=400, 
-        description="HTTP status code"
-    )
+class RunDetail(Run):
+    steps: list[RunStep] = Field(default_factory=list)
 
 
-# Authentication models
+class RunSummary(BaseModel):
+    id: UUID
+    repository_full_name: str
+    issue_number: int
+    issue_title: str
+    status: RunStatus
+    confidence: ConfidenceLevel | None = None
+    pr_url: str | None = None
+    created_at: datetime
+    completed_at: datetime | None = None
 
-class OAuthStart(BaseModel):
-    """Start OAuth flow."""
-    redirect_url: str = Field(..., description="URL to redirect user to")
+
+class ListRunsParams(BaseModel):
+    limit: int = Field(default=20, ge=1, le=100)
+    cursor: str | None = Field(default=None, max_length=256)
+    status: RunStatus | None = None
+
+
+class RunListResponse(BaseModel):
+    data: list[RunSummary]
+    next_cursor: str | None
+    has_more: bool
+
+
+class RetryResponse(BaseModel):
+    status: str = "retry_queued"
+    run_id: UUID
 
 
 class SessionInfo(BaseModel):
-    """Session information for authenticated requests."""
-    user_id: str = Field(..., description="Authenticated user ID")
-    session_id: str = Field(..., description="Session cookie ID")
-    expires_at: str = Field(..., description="ISO expiration timestamp")
+    authenticated: bool
+    github_login: str | None = None
+    github_user_id: int | None = None
 
 
-# Rate limiting
+class LogoutResponse(BaseModel):
+    status: str = "logged_out"
 
-class RateLimitError(ApiError):
-    """Rate limit exceeded error."""
-    retry_after: Optional[int] = Field(
-        default=None, 
-        description="Seconds to wait before retrying"
+
+class GitHubWebhookPayload(BaseModel):
+    action: str
+    issue: dict[str, Any] | None = None
+    repository: dict[str, Any]
+    sender: dict[str, Any]
+    installation: dict[str, Any] | None = None
+
+
+class SSEEvent(BaseModel):
+    event: str
+    data: dict[str, Any]
+
+
+# ------------------------------------------------------------
+# LangGraph Run State - must match TS types in packages/shared/types.ts
+# ------------------------------------------------------------
+
+
+class RunState(BaseModel):
+    """Typed graph state shared across all pipeline nodes.
+
+    Kept in sync with packages/shared/types.ts:
+    - status: RunStatus enum
+    - confidence: ConfidenceLevel enum
+    - step: PipelineStep enum
+    """
+
+    # Identification
+    run_id: str = Field(
+        default_factory=lambda: f"run-{__import__('hashlib').sha256(
+            __import__('uuid').uuid4().encode
+        ).hexdigest()[:12]}"
+    )
+    issue_id: int = Field(..., description="GitHub issue number")
+    repo_name: str = Field(..., description="Repository in owner/name format")
+    branch: str = Field(
+        default="agent-fix",
+        description="Working branch name",
     )
 
-
-# Request/response wrappers
-
-class successResponse(BaseModel):
-    """Standard success response wrapper."""
-    success: bool = Field(default=True)
-    data: Optional[Any] = Field(default=None, description="Response data")
-    message: Optional[str] = Field(
-        default=None, 
-        description="Optional success message"
+    # Status & Step Tracking
+    status: RunStatus = Field(
+        default=RunStatus.pending,
+        description="Current run status",
     )
-
-
-# Run event SSE model
-
-class RunEvent(BaseModel):
-    """SSE event for run status updates."""
-    run_id: str = Field(..., description="Run identifier")
-    status: RunStatus = Field(..., description="New status")
-    step: Optional[PipelineStep] = Field(
-        default=None, 
-        description="New step"
+    step: PipelineStep = Field(
+        default=PipelineStep.read,
+        description="Current pipeline step",
     )
     confidence: Optional[ConfidenceLevel] = Field(
-        default=None, 
-        description="New confidence"
-    )
-    timestamp: str = Field(
-        ..., 
-        description="ISO event timestamp"
+        default=None,
+        description="Confidence in current result: high/medium/low",
     )
 
-
-# Deduplication model
-
-class DedupKey(BaseModel):
-    """Key for deduping GitHub webhook deliveries."""
-    installation_id: int = Field(
-        ..., 
-        description="GitHub App installation ID"
+    # Issue Details
+    issue_title: Optional[str] = Field(
+        default=None,
+        description="Issue title from GitHub",
     )
-    delivery_id: str = Field(
-        ..., 
-        description="GitHub delivery ID"
+    issue_body: Optional[str] = Field(
+        default=None,
+        description="Issue body/description",
+    )
+    reproduction_steps: Optional[str] = Field(
+        default=None,
+        description="Extracted reproduction steps from issue",
+    )
+
+    # Before Fix Evidence
+    before_test_output: Optional[str] = Field(
+        default=None,
+        description="Test output before the fix was applied",
+    )
+    before_exit_code: Optional[int] = Field(
+        default=None,
+        description="Exit code before the fix",
+    )
+
+    # After Fix Evidence
+    after_test_output: Optional[str] = Field(
+        default=None,
+        description="Test output after the fix was applied",
+    )
+    after_exit_code: Optional[int] = Field(
+        default=None,
+        description="Exit code after the fix",
+    )
+
+    # Root Cause & Patch
+    root_cause: Optional[str] = Field(
+        default=None,
+        description="Plain-English root cause diagnosis",
+    )
+    patch: Optional[dict[str, str]] = Field(
+        default=None,
+        description="Applied patch: {file_path, old_code, new_code, description}",
+    )
+    likely_file: Optional[str] = Field(
+        default=None,
+        description="Likely file containing the bug",
+    )
+    likely_line: Optional[int] = Field(
+        default=None,
+        description="Likely line number containing the bug",
+    )
+
+    # Evidence & Errors
+    evidence: list[str] = Field(
+        default_factory=list,
+        description="Supporting evidence for root cause",
+    )
+    errors: list[str] = Field(
+        default_factory=list,
+        description="Error messages encountered during run",
+    )
+
+    # PR & Branch Information
+    pr_url: Optional[str] = Field(
+        default=None,
+        description="Draft PR URL if opened",
+    )
+    branch_name: Optional[str] = Field(
+        default=None,
+        description="Git branch name where patch was applied",
+    )
+
+    # Metadata
+    retry_count: int = Field(
+        default=0,
+        description="Number of retry attempts for this run",
+    )
+    created_at: str = Field(
+        default_factory=lambda: __import__('datetime').datetime.utcnow().isoformat()
+        + "Z",
+        description="ISO timestamp when run was created",
+    )
+    updated_at: str = Field(
+        default_factory=lambda: __import__('datetime').utcnow().isoformat() + "Z",
+        description="ISO timestamp when run was last updated",
     )
