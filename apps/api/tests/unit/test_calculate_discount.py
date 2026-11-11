@@ -1,6 +1,6 @@
 """Unit tests for calculate_discount off-by-one bug."""
 
-from apps.api.demo_bugs.calculations.calculations import calculate_discount
+from demo_bugs.calculations.calculations import calculate_discount
 
 
 def test_calculate_discount_correct_formula():

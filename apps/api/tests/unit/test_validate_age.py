@@ -1,6 +1,6 @@
 """Unit tests for validate_age wrong boundary bug."""
 
-from apps.api.demo_bugs.validation.validate_age import validate_age
+from demo_bugs.validation.validate_age import validate_age
 
 
 def test_validate_age_adult_18_should_be_valid():

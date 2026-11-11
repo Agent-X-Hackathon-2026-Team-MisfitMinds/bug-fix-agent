@@ -1,6 +1,6 @@
 """Unit tests for get_user_profile missing null bug."""
 
-from apps.api.demo_bugs.profiles.get_user_profile import get_user_profile
+from demo_bugs.profiles.get_user_profile import get_user_profile
 
 
 def test_get_user_profile_valid_id():
