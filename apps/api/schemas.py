@@ -196,9 +196,21 @@ class RunState(BaseModel):
         default=None,
         description="Test output before the fix was applied",
     )
+    before_output: Optional[str] = Field(
+        default=None,
+        description="Alias for baseline test output",
+    )
     before_exit_code: Optional[int] = Field(
         default=None,
         description="Exit code before the fix",
+    )
+    reproduction_test_code: Optional[str] = Field(
+        default=None,
+        description="Generated reproduction test code",
+    )
+    confidence_reasons: list[str] = Field(
+        default_factory=list,
+        description="Reasons for confidence level",
     )
 
     # After Fix Evidence
@@ -247,6 +259,10 @@ class RunState(BaseModel):
     branch_name: Optional[str] = Field(
         default=None,
         description="Git branch name where patch was applied",
+    )
+    comment: Optional[str] = Field(
+        default=None,
+        description="Comment to post on the issue",
     )
 
     # Metadata
