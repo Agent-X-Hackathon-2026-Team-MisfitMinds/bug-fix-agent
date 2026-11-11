@@ -271,11 +271,10 @@ class RunState(BaseModel):
         description="Number of retry attempts for this run",
     )
     created_at: str = Field(
-        default_factory=lambda: __import__('datetime').datetime.utcnow().isoformat()
-        + "Z",
+        default_factory=lambda: __import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat().replace("+00:00", "Z"),
         description="ISO timestamp when run was created",
     )
     updated_at: str = Field(
-        default_factory=lambda: __import__('datetime').utcnow().isoformat() + "Z",
+        default_factory=lambda: __import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat().replace("+00:00", "Z"),
         description="ISO timestamp when run was last updated",
     )

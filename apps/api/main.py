@@ -51,6 +51,9 @@ def mark_run_failed(application: FastAPI, run_id: UUID, exc: BaseException) -> N
     except Exception:
         logger.warning("cannot mark run %s failed: run not found", run_id)
         return
+    if run is None:
+        logger.warning("cannot mark run %s failed: run not found", run_id)
+        return
     if run.status in TERMINAL:
         return
     message = _describe(exc)
