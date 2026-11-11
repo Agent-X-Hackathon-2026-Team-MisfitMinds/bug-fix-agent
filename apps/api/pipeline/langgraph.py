@@ -87,9 +87,21 @@ class RunState(BaseModel):
         default=None,
         description="Test output before the fix was applied",
     )
+    before_output: Optional[str] = Field(
+        default=None,
+        description="Alias for baseline test output",
+    )
     before_exit_code: Optional[int] = Field(
         default=None,
         description="Exit code before the fix",
+    )
+    reproduction_test_code: Optional[str] = Field(
+        default=None,
+        description="Generated reproduction test code",
+    )
+    confidence_reasons: List[str] = Field(
+        default_factory=list,
+        description="Reasons for confidence level",
     )
 
     # After Fix Evidence
@@ -428,7 +440,7 @@ async def diagnose_node(
 
 def determine_location(
     root_cause: str, repo_structure: dict
-) -> tuple[Optional[int], Optional[str]]:
+) -> tuple[Optional[str], Optional[int]]:
     """Determine likely file and line from root cause analysis.
 
     Uses heuristic matching against repo structure.
@@ -684,7 +696,7 @@ def _generate_pr_body(state: RunState) -> str:
     after_output = state.after_test_output or "No post-fix test output available"
     root_cause = state.root_cause or "Not diagnosed"
     patch_desc = state.patch.get("description", "Minimal code change") if state.patch else "Minimal code change"
-    confidence = state.confidence or "low"
+    confidence = state.confidence.value if state.confidence else "low"
 
     body = f"""## Bug Fix Summary
 
@@ -705,7 +717,7 @@ def _generate_pr_body(state: RunState) -> str:
 - **Status:** {'Green ✅' if state.status == RunStatus.verified else 'Red ❌'}
 - **Tests Run:** {len(state.errors) if state.errors else 0}
 
-### Confidence: {confidence.value.upper()}
+### Confidence: {confidence.upper()}
 **Reasons:** {state.confidence_reasons or 'Could not assess'} 
 
 ### Evidence

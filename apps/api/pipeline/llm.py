@@ -92,13 +92,13 @@ class LLMWrapper:
         self.provider = provider
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY", "")
         self.cache = cache or PromptCache()
-        self._rate_limit_time = 0
+        self._rate_limit_time = 0.0
         self._rate_limit_seconds = 60  # Default 60s cooldown
 
         # Initialize the provider
         if self.api_key:
             if self.provider == "gemini":
-                genai.configure(api_key=self.api_key)
+                genai.configure(api_key=self.api_key)  # type: ignore[attr-defined]
             # Groq would be initialized here
 
     def _check_rate_limit(self) -> bool:
@@ -142,8 +142,8 @@ class LLMWrapper:
         """
         # Step 1: Check cache
         cached = self.cache.get(issue_title, issue_body, prompt, prompt_version)
-        if cached and not force_cache:
-            return cached
+        if cached is not None and not force_cache:
+            return str(cached)
 
         # Step 2: Check rate limit
         if not self._check_rate_limit():
@@ -192,7 +192,7 @@ class LLMWrapper:
             raise RuntimeError("GEMINI_API_KEY is not configured; cannot call LLM.")
 
         try:
-            model = genai.GenerativeModel(
+            model = genai.GenerativeModel(  # type: ignore[attr-defined]
                 model_name="gemini-1.5-flash"
             )
 
@@ -206,13 +206,13 @@ class LLMWrapper:
 
             response = model.generate_content(
                 prompt,
-                safety_settings=safety_settings,
+                safety_settings=safety_settings,  # type: ignore[arg-type]
             )
 
             text = response.text
             if not text:
                 raise RuntimeError("LLM returned an empty response.")
-            return text
+            return str(text)
 
         except Exception as e:
             error_msg = str(e).lower()

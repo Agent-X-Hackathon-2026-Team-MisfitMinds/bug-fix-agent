@@ -257,7 +257,7 @@ def clone_and_test(
 # ------------------------------------------------------------
 
 
-def example_usage():
+def example_usage() -> None:
     """Example of how LangGraph reproduce_node would use the sandbox."""
 
     from .sandbox import SandboxConfig
