@@ -44,7 +44,10 @@ class RunRepo:
         self._steps: dict[UUID, list[RunStep]] = {}
 
     def get_by_id(self, run_id):
-        return self._runs.get(run_id)
+        run = self._runs.get(run_id)
+        if run is None:
+            raise NotFoundError("Run not found")
+        return run
 
     def get_steps_by_id(self, run_id):
         return list(self._steps.get(run_id, []))
@@ -101,6 +104,16 @@ class RunRepo:
 
     def add_step(self, step: RunStep) -> None:
         self._steps.setdefault(step.run_id, []).append(step)
+
+    def update_step(self, step: RunStep) -> RunStep:
+        steps = self._steps.setdefault(step.run_id, [])
+        for idx, existing in enumerate(steps):
+            if existing.id == step.id:
+                steps[idx] = step
+                return step
+        # Unknown step: append it.
+        steps.append(step)
+        return step
 
     def check_retryable(self, caller: Caller, run_id: UUID) -> Run:
         run = self.get(caller, run_id)
