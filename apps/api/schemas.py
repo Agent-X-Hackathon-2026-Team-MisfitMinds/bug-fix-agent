@@ -5,7 +5,7 @@ logical schema in `docs/06-data-api.md`.
 """
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any
+from typing import Any, Optional
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
@@ -139,41 +139,6 @@ class SSEEvent(BaseModel):
 # ------------------------------------------------------------
 # LangGraph Run State - must match TS types in packages/shared/types.ts
 # ------------------------------------------------------------
-
-
-class RunStatus(str, Enum):
-    """Current run status - must match TS RunStatus.
-
-    Required values: pending, reproducing, fixing, verifying,
-    completed, failed, could_not_reproduce
-    """
-    pending = "pending"
-    reproducing = "reproducing"
-    fixing = "fixing"
-    verifying = "verifying"
-    completed = "completed"
-    failed = "failed"
-    could_not_reproduce = "could_not_reproduce"
-
-
-class ConfidenceLevel(str, Enum):
-    """Confidence level in the result - must match TS ConfidenceLevel."""
-    high = "high"
-    medium = "medium"
-    low = "low"
-
-
-class PipelineStep(str, Enum):
-    """Current pipeline step - must match TS PipelineStep.
-
-    Required values: read, reproduce, diagnose, fix, verify, pr
-    """
-    read = "read"
-    reproduce = "reproduce"
-    diagnose = "diagnose"
-    fix = "fix"
-    verify = "verify"
-    pr = "pr"
 
 
 class RunState(BaseModel):

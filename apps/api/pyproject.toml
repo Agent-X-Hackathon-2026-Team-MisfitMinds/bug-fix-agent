@@ -6,6 +6,10 @@ target-version = "py312"
 strict = true
 python_version = "3.12"
 
+[[tool.mypy.overrides]]
+module = "google.*"
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]

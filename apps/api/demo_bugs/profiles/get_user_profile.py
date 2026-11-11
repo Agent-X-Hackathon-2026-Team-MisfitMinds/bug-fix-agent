@@ -1,7 +1,7 @@
 """Module with missing null check in get_user_profile function."""
 
 
-def get_user_profile(user_id) -> dict | None:
+def get_user_profile(user_id: int | str | None) -> dict[str, object] | None:
     """Get user profile by user ID.
     
     Missing null bug: Does not handle None user_id, causes TypeError.
@@ -9,7 +9,7 @@ def get_user_profile(user_id) -> dict | None:
     """
     # BUG: No None check - will raise TypeError if user_id is None
     # Should have: if user_id is None: return None
-    profile = {
+    profile: dict[str, object] = {
         "id": user_id,
         "name": f"User {user_id}",
         "email": f"user{user_id}@example.com",

@@ -242,7 +242,7 @@ def clone_and_test(
             ), False
 
     # Step 3: Run tests (network should be disabled now)
-    test_result = run_tests(config, container_name)
+    test_result = run_sandbox(config, container_name)
 
     # Return combined result
     success = test_result.ok and not test_result.timed_out
@@ -254,12 +254,8 @@ def clone_and_test(
 # ------------------------------------------------------------
 
 
-def example_usage():
+def example_usage() -> None:
     """Example of how LangGraph reproduce_node would use the sandbox."""
-
-    from .sandbox import SandboxConfig, clone_and_test, run_sandbox, install_command
-
-    config = SandboxConfig()
 
     # Example 1: Full clone + install + test workflow
     # repo_url = "https://github.com/user/bug-fix-agent-demo.git"

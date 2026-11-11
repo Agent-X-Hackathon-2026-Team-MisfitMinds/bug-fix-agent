@@ -30,8 +30,11 @@ def _webhook_secret() -> str:
     return secret
 
 
+TRIGGER_ACTIONS = frozenset({"opened", "labeled"})
+
+
 def is_agent_fix_labeled(payload: GitHubWebhookPayload) -> bool:
-    if payload.action != "labeled" or payload.issue is None:
+    if payload.action not in TRIGGER_ACTIONS or payload.issue is None:
         return False
     labels = payload.issue.get("labels", [])
     return any(str(label.get("name", "")).lower() == "agent-fix" for label in labels)

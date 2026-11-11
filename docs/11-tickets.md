@@ -248,7 +248,7 @@ Task: `POST /webhooks/github` verifies `X-Hub-Signature-256`, dedups by `X-GitHu
 Accept:
 - [ ] Valid webhook → run created; returns 200 with delivery_id
 - [ ] Invalid signature → 401; missing headers → 400; duplicate delivery → 409
-- [ ] Only `issues.labeled` with `label.name == "agent-fix"` triggers a run
+- [ ] Only `issues.labeled` or `issues.opened` carrying `label.name == "agent-fix"` triggers a run
 - [ ] Webhook body never rendered; only extracted fields stored
 Test: pytest integration tests for webhook (valid/invalid/duplicate/missing); signature helper test
 Depends: T-06, T-13

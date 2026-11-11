@@ -10,11 +10,15 @@ Cache rehearsed demo issues before the live demo.
 from __future__ import annotations
 
 import hashlib
+import json
 import time
 import os
-from typing import Optional, Callable, Any, Dict, List
+from typing import Dict, List, Optional
 
-import google.generativeai as genai
+try:
+    import google.generativeai as genai
+except ImportError:  # pragma: no cover - optional dependency
+    genai = None
 
 
 class RateLimitError(Exception):
@@ -35,7 +39,7 @@ class PromptCache:
     """
 
     def __init__(self, ttl_hours: int = 24):
-        self._cache: Dict[str, tuple[Any, float]] = {}
+        self._cache: Dict[str, tuple[str, float]] = {}
         self.ttl = ttl_hours * 3600  # Convert to seconds
 
     def _hash(self, issue_title: str, issue_body: str, prompt_version: str = "v1") -> str:
@@ -43,7 +47,7 @@ class PromptCache:
         combined = f"{issue_title}|{issue_body}|{prompt_version}"
         return hashlib.sha256(combined.encode()).hexdigest()
 
-    def get(self, issue_title: str, issue_body: str, prompt_version: str = "v1") -> Optional[Any]:
+    def get(self, issue_title: str, issue_body: str, prompt_version: str = "v1") -> Optional[str]:
         """Retrieve cached result if not expired.
 
         Returns cached result or None if not found/expired.
@@ -59,7 +63,7 @@ class PromptCache:
                 del self._cache[key]
         return None
 
-    def set(self, issue_title: str, issue_body: str, prompt_version: str = "v1", result: Any = None) -> None:
+    def set(self, issue_title: str, issue_body: str, prompt_version: str = "v1", result: str = "") -> None:
         """Store result with current timestamp."""
         key = self._hash(issue_title, issue_body, prompt_version)
         self._cache[key] = (result, time.time())
@@ -91,7 +95,7 @@ class LLMWrapper:
         self.provider = provider
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY", "")
         self.cache = cache or PromptCache()
-        self._rate_limit_time = 0
+        self._rate_limit_time: float = 0.0
         self._rate_limit_seconds = 60  # Default 60s cooldown
 
         # Initialize the provider
@@ -166,7 +170,7 @@ class LLMWrapper:
 
         # If node_name is provided, also cache with "rehearsed" version for future use
         # and optionally prepend template-based guidance
-        if node_name and node_name in self.PROMPT_TEMPLATES:
+        if node_name and node_name in PROMPT_TEMPLATES:
             # Could prepend template guidance, but for now just cache
             pass
 
@@ -187,8 +191,8 @@ class LLMWrapper:
         Raises:
             RateLimitError: If rate limited by provider
         """
-        if not self.api_key:
-            # No API key available - return mock response for development
+        if not self.api_key or genai is None:
+            # No API key or dependency available - return mock response for development
             return self._mock_llm_response(prompt)
 
         try:
@@ -209,7 +213,7 @@ class LLMWrapper:
                 safety_settings=safety_settings,
             )
 
-            text = response.text
+            text: str = response.text
             if text:
                 return text
             else:
@@ -280,7 +284,7 @@ class LLMWrapper:
                 "note": "Mock response - configure GEMINI_API_KEY for real LLM calls"
             })
 
-    def cache_rehearsed_issues(self, rehearsed_issues: List[dict]) -> None:
+    def cache_rehearsed_issues(self, rehearsed_issues: List[dict[str, str]]) -> None:
         """Pre-cache results for demo/rehearsal issues before live demo.
 
         Args:
