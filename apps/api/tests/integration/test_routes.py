@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi.testclient import TestClient
 
 from auth.deps import SESSION_COOKIE
@@ -6,6 +8,15 @@ from main import app
 from schemas import PipelineStep, Run, RunStatus, RunStep, StepStatus
 
 client = TestClient(app)
+
+
+class QueueSpy:
+    def __init__(self) -> None:
+        self.run_ids: list[UUID] = []
+
+    def enqueue(self, run_id: UUID) -> bool:
+        self.run_ids.append(run_id)
+        return True
 
 
 def login(login: str = "alice", installation_id: int = 1) -> str:
@@ -173,6 +184,22 @@ def test_retry_is_idempotent_and_scoped_to_run() -> None:
     assert replay.status_code == 200
     assert replay.json() == first.json()
     assert conflict.status_code == 409
+
+
+def test_retry_reenqueues_the_run() -> None:
+    session_id = login()
+    run = create_run(status=RunStatus.failed)
+    spy = QueueSpy()
+    app.state.pipeline_queue = spy
+
+    response = client.post(
+        f"/runs/{run.id}/retry",
+        headers={"Idempotency-Key": "key-requeue"},
+        cookies={SESSION_COOKIE: session_id},
+    )
+
+    assert response.status_code == 200
+    assert spy.run_ids == [run.id]
 
 
 def test_list_rate_limit_returns_429() -> None:

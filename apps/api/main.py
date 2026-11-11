@@ -1,5 +1,9 @@
 """Main FastAPI application for the bug-fix agent."""
 
+import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -10,18 +14,41 @@ from data.idempotency import IdempotencyStore
 from data.run_repo import RunRepo
 from data.webhook_repo import DeliveryStore
 from errors import register_error_handlers
+from pipeline.queue import HANDLER_MODULE, HANDLER_NAME, PipelineQueue, load_handler
 from rate_limit import RateLimiter
 from routes.dev import router as dev_router
 from routes.runs import router as runs_router
 from security import add_security_headers
 from webhooks.github import router as github_router
 
+logger = logging.getLogger(__name__)
+
 settings = get_settings()
+
+
+@asynccontextmanager
+async def lifespan(application: FastAPI) -> AsyncIterator[None]:
+    """Start the run queue and drain it on shutdown."""
+    queue = PipelineQueue(load_handler())
+    application.state.pipeline_queue = queue
+    if queue.handler is None:
+        logger.warning(
+            "pipeline handler not registered (%s.%s); runs will stay pending",
+            HANDLER_MODULE,
+            HANDLER_NAME,
+        )
+    try:
+        yield
+    finally:
+        await queue.shutdown()
+        application.state.pipeline_queue = None
+
 
 app = FastAPI(
     title="Bug-Fix Agent API",
     description="API for the bug-fix agent system",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

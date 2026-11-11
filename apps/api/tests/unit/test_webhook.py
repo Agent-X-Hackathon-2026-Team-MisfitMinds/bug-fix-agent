@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import json
 from typing import Any
+from uuid import UUID
 
 from fastapi.testclient import TestClient
 
@@ -12,6 +13,15 @@ from webhooks.github import extract_run_fields, verify_webhook_signature
 
 SECRET = "test-webhook-secret"
 client = TestClient(app)
+
+
+class QueueSpy:
+    def __init__(self) -> None:
+        self.run_ids: list[UUID] = []
+
+    def enqueue(self, run_id: UUID) -> bool:
+        self.run_ids.append(run_id)
+        return True
 
 
 def sign(body: bytes, secret: str = SECRET) -> str:
@@ -84,6 +94,20 @@ def test_non_agent_fix_label_does_not_create_run(monkeypatch: Any) -> None:
     repo: RunRepo = app.state.run_repo
     runs, _ = repo.list(Caller(123, "octocat"))
     assert runs == []
+
+
+def test_agent_fix_delivery_enqueues_the_run(monkeypatch: Any) -> None:
+    monkeypatch.setenv("GITHUB_APP_WEBHOOK_SECRET", SECRET)
+    spy = QueueSpy()
+    app.state.pipeline_queue = spy
+
+    response = post(payload(), delivery="delivery-queue")
+
+    assert response.status_code == 200
+    repo: RunRepo = app.state.run_repo
+    runs, _ = repo.list(Caller(123, "octocat"))
+    assert len(runs) == 1
+    assert spy.run_ids == [runs[0].id]
 
 
 def test_opened_with_agent_fix_label_creates_run(monkeypatch: Any) -> None:
