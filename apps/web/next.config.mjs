@@ -2,6 +2,7 @@
 const backend = process.env.API_BACKEND_URL;
 const config = {
   output: 'standalone',
+  devIndicators: false,
   async rewrites() {
     return backend ? [
       { source: '/api/:path*', destination: `${backend}/:path*` },

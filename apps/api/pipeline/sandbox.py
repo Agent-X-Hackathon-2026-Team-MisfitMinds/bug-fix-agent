@@ -152,3 +152,122 @@ def run_sandbox(
 def install_command(package: str = ".") -> tuple[str, ...]:
     """Dependency install runs while the image still has network access."""
     return ("python", "-m", "pip", "install", "--no-cache-dir", package)
+
+
+def clone_repository(
+    repo_url: str,
+    container_name: str,
+    timeout: int = 60,
+) -> tuple[bool, str]:
+    """Clone a repository inside a Docker container.
+
+    Returns (success, message) tuple.
+    """
+    cmd = [
+        "docker", "run",
+        "--rm",
+        "--name", container_name,
+        "--network=none",
+        f"--user={SANDBOX_USER}",
+        f"--memory={DEFAULT_MEMORY}",
+        f"--cpus={DEFAULT_CPUS}",
+        "--read-only",
+        "--tmpfs",
+        "/tmp:rw,noexec,nosuid,size=64m",
+        "--security-opt",
+        "no-new-privileges",
+        "--cap-drop",
+        "ALL",
+        "--pids-limit",
+        "128",
+        SANDBOX_IMAGE,
+        "git", "clone", repo_url, "/workspace",
+    ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        if result.returncode == 0:
+            return True, "Repository cloned successfully"
+        else:
+            return False, f"Git clone failed: {result.stderr}"
+    except subprocess.TimeoutExpired:
+        return False, "Git clone timed out"
+
+
+def clone_and_test(
+    repo_url: str,
+    config: SandboxConfig,
+    container_name: str,
+    *,
+    install_first: bool = True,
+) -> tuple[SandboxResult, bool]:
+    """Full workflow: clone repository, optionally install deps, then run tests.
+
+    This is the main function the LangGraph reproduce_node should call.
+
+    Args:
+        repo_url: URL of the GitHub repository to clone
+        config: Sandbox configuration
+        container_name: Name for the Docker container
+        install_first: If True, install dependencies before running tests
+            (requires network access). If False, assumes dependencies are
+            already baked into the image.
+
+    Returns:
+        Tuple of (SandboxResult, bool) where bool indicates if the workflow
+        completed successfully (not timed out).
+    """
+    # Step 1: Clone the repository
+    success, clone_msg = clone_repository(repo_url, container_name)
+    if not success:
+        # Return a failed result
+        failed_result = SandboxResult(
+            exit_code=1,
+            stdout="",
+            stderr=clone_msg,
+            environment_error=True,
+        )
+        return failed_result, False
+
+    # Step 2: If install_first, install dependencies (requires network)
+    if install_first:
+        install_container_name = f"{container_name}-install"
+        install_result = run_sandbox(config, install_container_name)
+        if not install_result.ok:
+            # Return failed result - couldn't install dependencies
+            return SandboxResult(
+                exit_code=1,
+                stdout="",
+                stderr=f"Dependency installation failed: {install_result.stderr}",
+                environment_error=True,
+            ), False
+
+    # Step 3: Run tests (network should be disabled now)
+    test_result = run_tests(config, container_name)
+
+    # Return combined result
+    success = test_result.ok and not test_result.timed_out
+    return test_result, success
+
+
+# ------------------------------------------------------------
+# Example Usage for Pipeline Integration
+# ------------------------------------------------------------
+
+
+def example_usage():
+    """Example of how LangGraph reproduce_node would use the sandbox."""
+
+    from .sandbox import SandboxConfig, clone_and_test, run_sandbox, install_command
+
+    config = SandboxConfig()
+
+    # Example 1: Full clone + install + test workflow
+    # repo_url = "https://github.com/user/bug-fix-agent-demo.git"
+    # container_name = "bugfix-agent-test-1"
+    # result, success = clone_and_test(repo_url, config, container_name)
+    # print(f"Result: {result.message()}, Success: {success}")
+
+    # Example 2: Just run tests (assume image already has deps)
+    # container_name = "bugfix-agent-test-2"
+    # result = run_sandbox(config, container_name)
+    # print(f"Test result: {result.message()}")
