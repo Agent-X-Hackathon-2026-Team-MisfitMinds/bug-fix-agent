@@ -13,7 +13,7 @@ import hashlib
 import json
 import time
 import os
-from typing import Optional, Callable, Any, Dict, List
+from typing import Optional, Any, Dict, List
 
 import google.generativeai as genai
 

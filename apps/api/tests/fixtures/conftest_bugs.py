@@ -4,8 +4,6 @@ Provides demo repo structure, bug instances, and test data for
 integration testing of the LangGraph pipeline.
 """
 
-import json
-from pathlib import Path
 from apps.api.demo_bugs.calculations.calculations import calculate_discount
 from apps.api.demo_bugs.validation.validate_age import validate_age
 from apps.api.demo_bugs.profiles.get_user_profile import get_user_profile
