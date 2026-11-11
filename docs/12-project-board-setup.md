@@ -53,7 +53,7 @@ Columns: Backlog → Ready → In Progress → Review → QA → Done
 | T-14 | Docker sandbox | Done | Yash |
 | T-15 | LLM + caching | Backlog | Durgesh |
 | T-16 | Webhook handler | Done | Yash |
-| T-17 | Seeded demo repo | Done | You (QA) |
+| T-17 | Seeded demo repo | QA (repo verified, see docs/19; manual demo run pending on T-13) | You (QA) |
 
 ### Phase 5 · Integrations
 | Ticket | Title | Status | Owner |

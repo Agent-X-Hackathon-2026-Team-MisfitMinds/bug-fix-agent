@@ -373,7 +373,7 @@ All routes are served by the FastAPI backend (`apps/api/`). Auth means a valid s
 | `/auth/logout` | POST | Session cookie | 30/min per user |
 
 ### `POST /webhooks/github`
-Receives GitHub issue/PR webhook events. Verifies `X-Hub-Signature-256` using `GITHUB_APP_WEBHOOK_SECRET`. Dedups by `X-GitHub-Delivery`. On `issues.labeled` with label `agent-fix`, creates a `run` and queues the LangGraph pipeline.
+Receives GitHub issue/PR webhook events. Verifies `X-Hub-Signature-256` using `GITHUB_APP_WEBHOOK_SECRET`. Dedups by `X-GitHub-Delivery`. On `issues.labeled` or `issues.opened` where the issue carries the `agent-fix` label, creates a `run` and queues the LangGraph pipeline.
 
 **Input:** raw JSON body + headers (`X-GitHub-Delivery`, `X-Hub-Signature-256`, `X-GitHub-Event`)  
 **Output:** `{"status": "accepted", "delivery_id": "..."}`  

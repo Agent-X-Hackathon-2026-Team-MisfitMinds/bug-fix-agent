@@ -5,17 +5,19 @@ import {injectAxe,getViolations} from 'axe-playwright';
 const failedRun={id:'toast-test',repository_full_name:'test-owner/test-repo',issue_number:42,issue_title:'Mocked failed run',status:'failed',confidence:null,pr_url:null,created_at:'2026-01-01T00:00:00Z',steps:[]};
 
 test('success notification pauses on hover and focus and dismisses after remaining time',async({page})=>{
-  await page.clock.install();
+  // Use real time: advancing a simulated clock immediately after input can
+  // race React's hover/focus effect cleanup in some browser environments.
+  test.setTimeout(35000);
   await page.route('**/api/runs/toast-test/retry',route=>route.fulfill({json:{ok:true}}));
   await page.route('**/api/runs/toast-test',route=>route.fulfill({json:failedRun}));
   await page.goto('/dashboard/runs/toast-test');
   await page.getByRole('button',{name:'Retry run'}).click();
   const toast=page.locator('.ui-toast');await expect(toast.getByRole('status')).toHaveText('Retry queued.');
-  await page.clock.fastForward(2000);
-  await toast.hover();await page.clock.fastForward(7000);await expect(toast).toBeVisible();
-  const close=toast.getByRole('button',{name:'Dismiss notification'});await close.focus();
-  await page.mouse.move(0,0);await page.clock.fastForward(7000);await expect(toast).toBeVisible();
-  await close.blur();await page.clock.fastForward(4000);await expect(toast).toHaveCount(0);
+  await page.waitForTimeout(2000);
+  await toast.hover();await page.waitForTimeout(7000);await expect(toast).toBeVisible();
+  const close=toast.getByRole('button',{name:'Dismiss notification'});await close.focus();await expect(close).toBeFocused();
+  await page.mouse.move(0,0);await page.waitForTimeout(7000);await expect(toast).toBeVisible();
+  await close.blur();await expect(toast).toHaveCount(0,{timeout:4000});
 });
 
 test('error notification stays visible and can be dismissed by keyboard',async({page})=>{

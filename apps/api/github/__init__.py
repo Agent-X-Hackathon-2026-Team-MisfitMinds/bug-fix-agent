@@ -18,9 +18,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import json
-import time
-from typing import Optional, Dict, Any, List, Union
+from typing import Optional, Dict, Any, List
 
 import httpx
 
@@ -84,7 +82,7 @@ def verify_webhook_signature(
 
 def verify_delivery_id(
     delivery_id: str,
-    stored_delivery_ids: Optional[set] = None,
+    stored_delivery_ids: Optional[set[str]] = None,
 ) -> bool:
     """Verify webhook delivery ID to prevent duplicate deliveries.
 
@@ -179,7 +177,8 @@ class GitHubAPIClient:
             # Log error but don't crash
             return None
 
-        return response.json()
+        data: Dict[str, Any] = response.json()
+        return data
 
     async def get_repo(self, repo_full_name: str) -> Optional[Dict[str, Any]]:
         """Fetch repository details from GitHub.
@@ -198,13 +197,15 @@ class GitHubAPIClient:
         elif response.status_code != 200:
             return None
 
-        return response.json()
+        data: Dict[str, Any] = response.json()
+        return data
 
     async def get_repo_language(self, repo_full_name: str) -> Optional[str]:
         """Get the primary language of a repository."""
         repo = await self.get_repo(repo_full_name)
         if repo:
-            return repo.get("language", "").lower()
+            language: str = repo.get("language", "")
+            return language.lower()
         return None
 
     async def push_branch_and_open_draft_pr(
@@ -230,8 +231,6 @@ class GitHubAPIClient:
         Returns:
             PR dictionary or None if failed
         """
-        import base64
-
         # 1. Push the branch
         # In a real implementation, this would use the Git REST API
         # to create or update the branch. For now, we'll simulate.
@@ -257,7 +256,8 @@ class GitHubAPIClient:
             # Log error
             return None
 
-        return response.json()
+        data: Dict[str, Any] = response.json()
+        return data
 
     async def add_issue_comment(
         self,
@@ -285,7 +285,8 @@ class GitHubAPIClient:
             # Log error but don't crash
             return None
 
-        return response.json()
+        data: Dict[str, Any] = response.json()
+        return data
 
     async def list_issues_labels(
         self,
@@ -308,8 +309,6 @@ class GitHubAPIClient:
         if response.status_code != 200:
             return None
 
-        label_info = response.json()
-
         # Now list issues with this label
         issues_endpoint = f"/repos/{repo_full_name}/issues"
         params = {"labels": label_name, "state": "open"}
@@ -318,7 +317,8 @@ class GitHubAPIClient:
         if response.status_code != 200:
             return None
 
-        return response.json()
+        issues: List[Dict[str, Any]] = response.json()
+        return issues
 
     async def check_run_ownership(
         self,
@@ -378,10 +378,10 @@ def create_github_client_from_env() -> Optional[GitHubAPIClient]:
         return None
 
     config = GitHubConfig(
-        app_id=app_id,
-        private_key=private_key,
-        installation_id=installation_id,
-        webhook_secret=webhook_secret,
+        app_id=app_id or "",
+        private_key=private_key or "",
+        installation_id=installation_id or "",
+        webhook_secret=webhook_secret or "",
         callback_url=os.environ.get("GITHUB_CALLBACK_URL", ""),
         webhook_url=os.environ.get("GITHUB_WEBHOOK_URL", ""),
     )

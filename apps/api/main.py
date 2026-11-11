@@ -11,6 +11,7 @@ from data.run_repo import RunRepo
 from data.webhook_repo import DeliveryStore
 from errors import register_error_handlers
 from rate_limit import RateLimiter
+from routes.dev import router as dev_router
 from routes.runs import router as runs_router
 from security import add_security_headers
 from webhooks.github import router as github_router
@@ -44,6 +45,8 @@ add_security_headers(app)
 app.include_router(auth_router, tags=["auth"])
 app.include_router(runs_router, tags=["runs"])
 app.include_router(github_router, prefix="/webhooks", tags=["webhooks"])
+if settings.environment == "development":
+    app.include_router(dev_router, tags=["dev"])
 
 
 @app.get("/health", tags=["root"])

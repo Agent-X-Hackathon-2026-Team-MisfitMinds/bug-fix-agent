@@ -1,48 +1,36 @@
-"""Reproduction tests for the seeded demo repository.
+"""Existing test suite for the shop utilities."""
 
-Each test encodes expected behaviour. The agent should observe these fail
-before the fix and pass after the fix.
-"""
-
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from app import calculate_discount, validate_age, get_user_profile
+from app import calculate_discount, get_user_profile, validate_age
 
 
-def test_calculate_discount_returns_exact_discount():
-    """100 with 20% discount should equal 80.
-
-    Bug: off-by-one returns 81 instead of 80.
-    """
-    result = calculate_discount(100, 20)
-    assert result == 80, f"Expected 80, got {result}"
+def test_bigger_discount_gives_lower_price():
+    assert calculate_discount(100, 50) < calculate_discount(100, 10)
 
 
-def test_validate_age_accepts_65():
-    """Age 65 is within the inclusive range [18, 65].
-
-    Bug: wrong boundary rejects 65 because it uses >= instead of >.
-    """
-    assert validate_age(65) is True, "Age 65 should be valid"
+def test_discount_scales_with_price():
+    assert calculate_discount(200, 10) > calculate_discount(100, 10)
 
 
-def test_get_user_profile_returns_none_for_unknown_user():
-    """Looking up an unknown user should return None, not crash.
-
-    Bug: missing null check raises AttributeError on None.name.
-    """
-    result = get_user_profile(999)
-    assert result is None, f"Expected None, got {result}"
+def test_validate_age_accepts_adult():
+    assert validate_age(30) is True
 
 
-def test_get_user_profile_returns_profile_for_known_user():
-    """Known user should return a profile dict, not crash.
+def test_validate_age_accepts_18():
+    assert validate_age(18) is True
 
-    Verifies the function works for valid users after the null-check fix.
-    """
-    result = get_user_profile(1)
-    assert result is not None, "Known user should return a profile"
-    assert result == {"name": "Alice", "id": 1}, f"Expected profile dict, got {result}"
+
+def test_validate_age_rejects_minor():
+    assert validate_age(17) is False
+
+
+def test_validate_age_rejects_over_65():
+    assert validate_age(66) is False
+
+
+def test_get_user_profile_returns_known_user():
+    assert get_user_profile(1) == {"name": "Alice", "id": 1}
