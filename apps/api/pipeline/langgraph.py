@@ -519,10 +519,14 @@ async def pr_node(
 
     # Push branch and open draft PR via GitHub API (Yash's integration)
     try:
+        files = {}
+        if state.patch:
+            files[state.patch.get("file_path", "")] = state.patch.get("new_code", "")
         github_result = await github_client.push_branch_and_open_draft_pr(
             branch_name=branch_name,
             pr_title=f"[Durgesh] Fix for issue {state.issue_id}",
             pr_body=pr_body,
+            files=files,
             maintainer_can_modify=True,
             # GitHub App MUST NOT have merge permission
         )
