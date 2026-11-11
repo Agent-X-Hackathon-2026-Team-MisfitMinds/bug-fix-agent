@@ -68,3 +68,6 @@
 .ui-toast-dismiss:focus-visible{outline:2px solid var(--ds-border-focus,var(--ds-brand));outline-offset:2px}
 @media(prefers-reduced-motion:reduce){.ui-button:not(:disabled):active{transform:none}}
 .ui-button.ui-button-danger:disabled:hover{background:#a51d34}
+
+/* Neutral states must not look like a successful run. */
+.badge.ui-status-neutral{background:var(--ds-elev);color:var(--ds-text-primary)}

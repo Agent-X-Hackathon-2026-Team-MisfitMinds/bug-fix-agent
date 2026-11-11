@@ -19,7 +19,7 @@ test('success notification pauses on hover and focus and dismisses after remaini
 });
 
 test('error notification stays visible and can be dismissed by keyboard',async({page})=>{
-  await page.clock.install();await page.setViewportSize({width:360,height:800});
+  await page.clock.install();await page.setViewportSize({width:360,height:800});await page.emulateMedia({reducedMotion:'reduce'});
   await page.route('**/api/runs/toast-test/retry',route=>route.fulfill({status:500,body:'server error'}));
   await page.route('**/api/runs/toast-test',route=>route.fulfill({json:failedRun}));
   await page.goto('/dashboard/runs/toast-test');await page.getByRole('button',{name:'Retry run'}).click();

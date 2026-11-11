@@ -24,5 +24,5 @@ describe('Toast',()=>{
   it('uses an alert announcement for an error',()=>expect(renderToStaticMarkup(h(Toast,{tone:'error',onDismiss:()=>{}},'Try again'))).toContain('role="alert"'));
 });
 describe('StatusBadge',()=>{
-  it('renders each supported tone and keeps the status in text',()=>{for(const tone of ['neutral','success','warning','error'] as const){const html=renderToStaticMarkup(h(StatusBadge,{label:`Status ${tone}`,tone}));expect(html).toContain(`Status ${tone}`);if(tone==='error'||tone==='warning')expect(html).toContain(tone)}});
+  it('renders each supported tone and keeps the status in text',()=>{for(const tone of ['neutral','success','warning','error'] as const){const html=renderToStaticMarkup(h(StatusBadge,{label:`Status ${tone}`,tone}));expect(html).toContain(`Status ${tone}`);expect(html).toContain(`ui-status-${tone}`);if(tone==='error'||tone==='warning')expect(html).toContain(tone)}});
 });

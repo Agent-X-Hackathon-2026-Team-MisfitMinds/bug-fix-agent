@@ -18,5 +18,5 @@ export function EmptyState({title,children,action}:{title:string;children:ReactN
 export {Toast} from './toast';
 type BadgeTone='neutral'|'success'|'warning'|'error';
 export function StatusBadge({label,tone='neutral'}:{label:string;tone?:BadgeTone}){
-  return <span className={`badge ${tone==='warning'?'warning':tone==='error'?'error':''}`.trim()}>{label}</span>;
+  return <span className={`badge ui-status-${tone} ${tone==='warning'?'warning':tone==='error'?'error':''}`.trim()}>{label}</span>;
 }
