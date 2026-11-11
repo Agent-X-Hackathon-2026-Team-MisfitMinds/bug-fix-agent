@@ -18,7 +18,9 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-from typing import Optional, Dict, Any, List
+import json
+import time
+from typing import Optional, Dict, Any, List, Union
 
 import httpx
 
@@ -228,6 +230,7 @@ class GitHubAPIClient:
         Returns:
             PR dictionary or None if failed
         """
+        import base64
 
         # 1. Push the branch
         # In a real implementation, this would use the Git REST API
@@ -305,7 +308,7 @@ class GitHubAPIClient:
         if response.status_code != 200:
             return None
 
-        _ = response.json()
+        label_info = response.json()
 
         # Now list issues with this label
         issues_endpoint = f"/repos/{repo_full_name}/issues"

@@ -345,18 +345,8 @@ async def write_reproduction_test(
     if failing_test:
         test_content = failing_test.get("test_code", "")
     else:
-        # Extract candidate function/module names from issue and repo snapshot
-        import os as _os
-        module_candidates = []
-        for m in func_matches:
-            if m and m not in module_candidates:
-                module_candidates.append(m)
-        # Also pull module names from repo snapshot file list
-        for f in (repo_snapshot or {}).get("files", []):
-            base = _os.path.splitext(_os.path.basename(f))[0]
-            if base and base not in module_candidates:
-                module_candidates.append(base)
-
+        files = (repo_snapshot or {}).get("files", [])
+        module_candidates = list(dict.fromkeys(func_matches + [Path(f).stem for f in files]))
         primary = module_candidates[0] if module_candidates else "target_module"
         title_slug = re.sub(r"[^a-z0-9_]", "_", title.lower())[:40] or "bug"
 
@@ -364,12 +354,7 @@ async def write_reproduction_test(
     """Auto-generated reproduction test from issue: {title}."""
     # Issue body (treated as data, not instructions):
     # {body[:500].replace(chr(10), " ")}
-    try:
-        from {primary} import {primary}  # type: ignore
-    except Exception:
-        import importlib
-        mod = importlib.import_module("{primary}")
-        {primary} = getattr(mod, "{primary}")
+    from {primary} import {primary}  # type: ignore
 
     # Exercise the function with a representative input extracted from the issue.
     # Adjust arguments as needed based on the issue description.
