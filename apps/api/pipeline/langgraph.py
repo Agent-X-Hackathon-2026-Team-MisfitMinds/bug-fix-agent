@@ -72,7 +72,7 @@ async def read_node(state: RunState, github_client) -> RunState:
         # Continue anyway - user may have confirmed it's Python
 
     # Mark as read step completed
-    state.step = PipelineStep.read
+    state.step = PipelineStep.reproduce
     state.status = RunStatus.pending
 
     return state
@@ -173,7 +173,7 @@ async def reproduce_node(
 
     # Store failing output for later comparison
     state.before_output = test_result.output
-    state.step = PipelineStep.reproduce
+    state.step = PipelineStep.diagnose
     state.status = RunStatus.reproducing
 
     return state
@@ -279,7 +279,7 @@ async def diagnose_node(
     # Log evidence summary
     state.evidence = evidence[:5]  # Cap at 5 pieces of evidence
 
-    state.step = PipelineStep.diagnose
+    state.step = PipelineStep.fix
     state.status = RunStatus.diagnosing
 
     return state
@@ -406,7 +406,7 @@ async def fix_node(
         "new_code": patch["new_code"],
         "description": patch.get("description", "Minimal code fix"),
     }
-    state.step = PipelineStep.fix
+    state.step = PipelineStep.verify
     state.status = RunStatus.fixing
 
     return state
@@ -475,7 +475,7 @@ async def verify_node(
     # Both checks passed - store after outputs
     state.after_test_output = full_suite.output
     state.after_exit_code = full_suite.exit_code
-    state.step = PipelineStep.verify
+    state.step = PipelineStep.pr
     state.status = RunStatus.verified
 
     return state
@@ -699,92 +699,40 @@ async def run_pipeline(
     read_file,
     repo_structure: dict,
 ) -> RunState:
-    """Run the full 6-node LangGraph pipeline for a GitHub issue.
-
-    Args:
-        issue_id: GitHub issue number
-        repo_name: Repository in owner/name format
-        github_client: Yash's GitHub integration client
-        yash_sandbox: Yash's sandbox interface
-        pytest_runner: Pytest runner instance
-        llm_analyze: Function for root cause analysis
-        llm_generate_patch: Function for code patch generation
-        apply_patch: Function for applying code changes
-        read_file: Function for reading source file at line
-        repo_structure: Repository structure dict
-
-    Returns:
-        RunState with final status and all collected data
-    """
-
-    # Initial state
     state = RunState(issue_id=issue_id, repo_name=repo_name)
-
-    # Define node sequence
-    nodes = [
-        ("read", lambda s: read_node(s, github_client)),
-        ("reproduce", lambda s: reproduce_node(s, yash_sandbox, pytest_runner)),
-        ("diagnose", lambda s: diagnose_node(s, llm_analyze, repo_structure)),
-        ("fix", lambda s: fix_node(s, apply_patch, read_file, llm_generate_patch)),
-        ("verify", lambda s: verify_node(s, pytest_runner)),
-        ("pr", lambda s: pr_node(s, github_client)),
-    ]
-
-    # Execute nodes with checkpoint logic
-    max_iterations = 20  # Prevent infinite loops
+    nodes = {
+        PipelineStep.read: lambda s: read_node(s, github_client),
+        PipelineStep.reproduce: lambda s: reproduce_node(s, yash_sandbox, pytest_runner),
+        PipelineStep.diagnose: lambda s: diagnose_node(s, llm_analyze, repo_structure),
+        PipelineStep.fix: lambda s: fix_node(s, apply_patch, read_file, llm_generate_patch),
+        PipelineStep.verify: lambda s: verify_node(s, pytest_runner),
+        PipelineStep.pr: lambda s: pr_node(s, github_client),
+    }
+    max_iterations = 20
     iteration = 0
-
     while iteration < max_iterations:
         iteration += 1
-
-        # Determine next step
-        next_step = should_continue(state)
-
-        if next_step == "end":
+        if state.status == RunStatus.could_not_reproduce:
             break
-
-        if next_step == "retry":
-            # Reset to diagnose node for retry
-            state.step = PipelineStep.diagnose
-            state.status = RunStatus.diagnosing
-            # Continue to diagnose
-            continue
-
-        # Execute the appropriate node
-        node_name, node_func = nodes[0]  # Simplified - in production, index based on current step
-
-        # Map status to node index (simplified mapping)
-        if state.status in [RunStatus.pending] or state.step == PipelineStep.read:
-            result_func = nodes[0][1]
-        elif state.status in [RunStatus.reproducing] or state.step == PipelineStep.reproduce:
-            result_func = nodes[1][1]
-        elif state.status in [RunStatus.diagnosing] or state.step == PipelineStep.diagnose:
-            result_func = nodes[2][1]
-        elif state.status in [RunStatus.fixing] or state.step == PipelineStep.fix:
-            result_func = nodes[3][1]
-        elif state.status in [RunStatus.verified] or state.step == PipelineStep.verify:
-            result_func = nodes[4][1]
-        elif state.status in [RunStatus.pr_open] or state.step == PipelineStep.pr:
-            result_func = nodes[5][1]
-        else:
-            result_func = nodes[0][1]  # Default to read
-
+        if state.status == RunStatus.pr_open:
+            break
+        if state.status == RunStatus.completed:
+            break
+        if state.status == RunStatus.failed:
+            if state.retry_count < 3:
+                state.retry_count += 1
+                state.step = PipelineStep.diagnose
+                state.status = RunStatus.diagnosing
+            else:
+                state.errors.append(f"Failed after {state.retry_count} retry attempts")
+                break
+        node = nodes.get(state.step)
+        if node is None:
+            break
         try:
-            state = await result_func(state)
+            state = await node(state)
         except Exception as e:
-            state.errors.append(f"Unexpected error in {node_name}: {e}")
+            state.errors.append(f"Unexpected error: {e}")
             state.status = RunStatus.failed
-            break
-
-        # Check if we should move to next node
-        continue_decision = should_continue(state)
-        if continue_decision == "end":
-            break
-        elif continue_decision == "retry":
-            # Reset retry count and go back
-            state.retry_count = 0
-            # Will loop back to appropriate node
             continue
-        # else: continue loop with updated state
-
     return state
