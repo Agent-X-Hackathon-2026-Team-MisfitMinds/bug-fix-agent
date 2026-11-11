@@ -187,9 +187,9 @@ class RunState(BaseModel):
 
     # Identification
     run_id: str = Field(
-        default_factory=lambda: f"run-{__import__('hashlib').sha256(
-            __import__('uuid').uuid4().encode
-        ).hexdigest()[:12]}"
+        default_factory=lambda: "run-" + __import__("hashlib").sha256(
+            str(__import__("uuid").uuid4()).encode()
+        ).hexdigest()[:12]
     )
     issue_id: int = Field(..., description="GitHub issue number")
     repo_name: str = Field(..., description="Repository in owner/name format")
