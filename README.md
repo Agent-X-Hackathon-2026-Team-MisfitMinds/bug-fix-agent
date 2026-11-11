@@ -11,12 +11,9 @@ does the work and streams progress over SSE; a Next.js dashboard shows each run.
 - **Backend — done and green on `main`:** GitHub App OAuth with encrypted sessions,
   run + retry routes, SSE stream, verified webhook with delivery dedup, Docker
   sandbox runner, security headers, rate limiting, and the API CI gates.
-- **Frontend — not on `main` yet.** `apps/web` currently holds only `package.json`
-  and `tsconfig.json`, so `npm run dev` and the compose `web` service do not work
-  until the Next.js app lands.
-- **Pipeline — not wired.** The webhook creates a run and calls
-  `app.state.pipeline_queue`, which is still `None`; nothing processes runs until
-  the agent graph is connected.
+- **Frontend — available in `apps/web`.** The demo workspace uses example data;
+  live backend sign-in, run data, retry and SSE still require integration testing.
+- **Pipeline status:** Queue and sandbox changes are present; end-to-end execution still needs verification.
 
 ## Layout
 
@@ -124,3 +121,28 @@ and reports vulnerable pins without failing the build.
 Once the frontend and the agent graph are connected: open the dashboard, label a
 seeded issue with `agent-fix`, and watch the run move through
 `read → reproduce → diagnose → fix → verify → pr` on `/dashboard/runs/<id>`.
+
+## Frontend setup (apps/web)
+
+From the repository root:
+
+```bash
+cd apps/web
+npm ci --workspaces=false
+npx playwright install chromium webkit
+npm run dev
+```
+
+Open http://localhost:3000. The demo workspace uses example data. Real GitHub sign-in and dashboard data require the backend setup and an `API_BACKEND_URL` supplied by the team. Do not commit credentials.
+
+Run the frontend checks from `apps/web`:
+
+```bash
+npm run check
+npm run test
+npx playwright test --workers=1
+```
+
+The Playwright command runs both Chromium and WebKit. On Windows WebKit only, `keyboard can navigate the app shell with a visible focus indicator` is skipped: in our Windows Playwright WebKit diagnostic, Tab skipped ordinary links. It still runs in Chromium and Linux WebKit. Revisit this limitation when the browser or Playwright is updated.
+
+The browser tests use mocked API responses and do not verify live backend integration. Playwright WebKit is not the same as testing Safari itself.

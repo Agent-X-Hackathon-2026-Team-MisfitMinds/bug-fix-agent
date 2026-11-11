@@ -13,6 +13,7 @@ for(const width of [360,768]){
     await expect(page.getByText(run.issue_body)).toBeVisible();
     await page.locator('.step-details summary').first().click();
     await expect(page.getByText('Step '+longText)).toBeVisible();
-    expect(await page.evaluate(()=>({width:document.documentElement.scrollWidth,viewport:window.innerWidth}))).toEqual({width,viewport:width});
+    const dimensions=await page.evaluate(()=>({scrollWidth:document.documentElement.scrollWidth,clientWidth:document.documentElement.clientWidth}));
+    expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
   });
 }
