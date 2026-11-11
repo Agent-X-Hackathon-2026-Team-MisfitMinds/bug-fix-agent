@@ -93,9 +93,13 @@ repositories** → pick the seeded demo repo → Install.
 actually reads:
 
 ```dotenv
+GITHUB_APP_ID=1234567
 GITHUB_APP_CLIENT_ID=Iv1.xxxxxxxxxxxx
 GITHUB_APP_CLIENT_SECRET=<client secret>
 GITHUB_APP_WEBHOOK_SECRET=<webhook secret>
+GITHUB_APP_PRIVATE_KEY=<contents of the .pem, multi-line or with \n escapes>
+GITHUB_INSTALLATION_ID=<number after /installations/ in the App URL>
+GITHUB_DEMO_REPO=Agent-X-Hackathon-2026-Team-MisfitMinds/seeded-demo-repo
 SESSION_SECRET=<openssl rand -hex 32>
 API_BASE_URL=http://localhost:8000
 WEB_ORIGIN=http://localhost:3000
@@ -106,17 +110,20 @@ Notes, all verified against `apps/api/config.py`:
 
 - `SESSION_SECRET` signs the OAuth state and encrypts tokens. The legacy alias
   `API_SECRET_KEY` still works, but prefer `SESSION_SECRET`.
-- `GITHUB_APP_ID` and the private key are **not read by any code yet** — keep them in
-  `.env` for the later installation-token work, but their absence will not stop the
-  webhook or OAuth from working today.
+- `GITHUB_APP_ID` + `GITHUB_APP_PRIVATE_KEY` mint installation tokens
+  (`apps/api/github_app.py`). `GITHUB_INSTALLATION_ID` + `GITHUB_DEMO_REPO` bind the
+  REST client (`apps/api/pipeline/github_client.py`) to one installed repository.
+  Leave them blank until you are ready to push branches or open draft PRs; the
+  webhook and OAuth flows do not need them.
 - Blank values fall back to defaults (`env_ignore_empty`), so an empty key is never a
   crash — it is a silent default, which is why step 7 checks behaviour, not just the
   file.
 - **`.env` is read from the working directory.** Starting uvicorn from `apps/api`
   ignores a root `.env`. Run from the repo root with `--app-dir apps/api` (step 6) or
   copy the file to `apps/api/.env`.
-- `.env` is git-ignored. Never commit it, and never add a `NEXT_PUBLIC_*` copy of
-  `GITHUB_APP_CLIENT_SECRET`, `SESSION_SECRET` or the webhook secret.
+- `.env` is git-ignored (and `*.pem` is too). Never commit either, and never add a
+  `NEXT_PUBLIC_*` copy of `GITHUB_APP_CLIENT_SECRET`, `SESSION_SECRET`, the webhook
+  secret or the private key.
 
 ## 6 · Run the API and the tunnel
 
@@ -132,11 +139,12 @@ python -m uvicorn --app-dir apps/api main:app --reload --port 8000
 Terminal 2:
 
 ```bash
-npx --yes smee-client --url https://smee.io/<your-channel> --target http://localhost:8000/webhooks/github --path /webhooks/github
+SMEE_URL=https://smee.io/<your-channel> scripts/dev-tunnel.sh
 ```
 
-`scripts/dev-tunnel.sh` used to wrap this, but it was reverted with #12 and is not on
-`main`; the one-liner above is the same thing.
+Override the API address if it is not on port 8000:
+`WEBHOOK_TARGET=http://localhost:8010/webhooks/github SMEE_URL=... scripts/dev-tunnel.sh`.
+The script is the same as running the `npx smee-client` one-liner by hand.
 
 ## 7 · Verify
 
@@ -211,6 +219,8 @@ prefix, not a code bug.
 - [ ] Client secret, webhook secret and private key generated and stored safely
 - [ ] App installed on the seeded demo repo only
 - [ ] `.env` has client id, client secret, webhook secret and `SESSION_SECRET`
+- [ ] `.env` has App ID, private key, installation id and `GITHUB_DEMO_REPO`
+      (needed to push agent branches and open draft PRs)
 - [ ] `curl localhost:8000/health` → 200
 - [ ] Signed local POST → `accepted`
 - [ ] Label an issue `agent-fix` → Recent Deliveries shows 200
