@@ -72,6 +72,30 @@ def test_get_repo_rejects_malformed_name() -> None:
     assert recorder.requests == []
 
 
+def test_add_issue_comment_posts_trimmed_markdown() -> None:
+    recorder = Recorder(
+        {("POST", "/repos/octo/repo/issues/4/comments"): [httpx.Response(201, json={"id": 9})]}
+    )
+
+    comment = asyncio.run(
+        _client(recorder).add_issue_comment(4, "  Could not reproduce this issue.\n")
+    )
+
+    assert comment["id"] == 9
+    request = recorder.requests[0]
+    assert str(request.url) == "https://api.github.com/repos/octo/repo/issues/4/comments"
+    assert _body(request) == {"body": "Could not reproduce this issue."}
+
+
+def test_add_issue_comment_rejects_an_empty_body() -> None:
+    recorder = Recorder({})
+
+    with pytest.raises(GitHubAPIError):
+        asyncio.run(_client(recorder).add_issue_comment(4, "   "))
+
+    assert recorder.requests == []
+
+
 def _happy_path(extra: dict[tuple[str, str], list[httpx.Response]]) -> Recorder:
     responses: dict[tuple[str, str], list[httpx.Response]] = {
         ("GET", "/repos/octo/repo/git/ref/heads/main"): [

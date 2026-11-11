@@ -17,6 +17,7 @@ from github_app import GITHUB_API, API_VERSION, GitHubAppAuth, auth_from_setting
 _REPO = re.compile(r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$")
 _REF = re.compile(r"^(?!-)[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$")
 _AGENT_BRANCH_PREFIX = "agent/"
+_MAX_COMMENT_CHARS = 65_000
 
 
 class GitHubAPIError(RuntimeError):
@@ -148,6 +149,26 @@ class GitHubClient:
         if number <= 0:
             raise GitHubAPIError("Issue number must be positive")
         return await self._expect("GET", f"/repos/{repo}/issues/{number}")
+
+    async def add_issue_comment(
+        self,
+        number: int,
+        body: str,
+        repository: str | None = None,
+    ) -> dict[str, Any]:
+        """Post a markdown comment on an issue (used for honest failure notes)."""
+        repo = _validate_repo(repository or self.repository)
+        if number <= 0:
+            raise GitHubAPIError("Issue number must be positive")
+        text = body.strip()
+        if not text:
+            raise GitHubAPIError("Comment body is required")
+        return await self._expect(
+            "POST",
+            f"/repos/{repo}/issues/{number}/comments",
+            json_body={"body": text[:_MAX_COMMENT_CHARS]},
+            allowed=(201,),
+        )
 
     async def get_repo(self, repository: str | None = None) -> dict[str, Any]:
         repo = _validate_repo(repository or self.repository)
@@ -300,6 +321,10 @@ def reset_default_client() -> None:
 
 async def get_issue(issue_id: int) -> dict[str, Any]:
     return await default_client().get_issue(issue_id)
+
+
+async def add_issue_comment(issue_number: int, body: str) -> dict[str, Any]:
+    return await default_client().add_issue_comment(issue_number, body)
 
 
 async def get_repo(repo_name: str | None = None) -> dict[str, Any]:
