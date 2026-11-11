@@ -14,8 +14,10 @@ Backup target: `apps/api/data/` directory (JSON run files, sessions, LLM cache, 
 # Create backup tarball (tar ships with Windows 10+; Compress-Archive would write a zip)
 tar -czf "backup-$(Get-Date -Format 'yyyyMMdd-HHmmss').tar.gz" -C apps/api data
 
-# Verify backup contents (tar.exe does not expand wildcards in PowerShell)
-tar -tzf (Get-ChildItem backup-*.tar.gz | Select-Object -Last 1).FullName
+# Verify the newest backup (tar.exe does not expand wildcards in PowerShell).
+# File names carry the timestamp, so sorting by name gives the newest last.
+$backup = Get-ChildItem backup-*.tar.gz | Sort-Object Name | Select-Object -Last 1
+if ($backup) { tar -tzf $backup.FullName } else { Write-Host "No backup files found" }
 ```
 
 ## Restore drill (< 10 minutes)
