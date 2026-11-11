@@ -54,7 +54,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("GEMINI_API_KEY", "LLM_API_KEY"),
     )
     gemini_model: str = Field(
-        default="gemini-1.5-flash",
+        default="gemini-3.8-flash",
         validation_alias=AliasChoices("GEMINI_MODEL"),
     )
     cookie_secure: bool = True
