@@ -208,6 +208,10 @@ class RunState(BaseModel):
         default=None,
         description="Generated reproduction test code",
     )
+    reproduction_test_path: Optional[str] = Field(
+        default=None,
+        description="Workspace-relative path of the generated reproduction test",
+    )
     confidence_reasons: list[str] = Field(
         default_factory=list,
         description="Reasons for confidence level",
@@ -232,6 +236,18 @@ class RunState(BaseModel):
         default=None,
         description="Applied patch: {file_path, old_code, new_code, description}",
     )
+    original_file_code: Optional[str] = Field(
+        default=None,
+        description="Pristine contents of the patched file before the first attempt",
+    )
+    patched_file_content: Optional[str] = Field(
+        default=None,
+        description="Complete contents of the patched file after the latest attempt",
+    )
+    verification_feedback: Optional[str] = Field(
+        default=None,
+        description="Pytest output from a failed verification attempt",
+    )
     likely_file: Optional[str] = Field(
         default=None,
         description="Likely file containing the bug",
@@ -255,6 +271,10 @@ class RunState(BaseModel):
     pr_url: Optional[str] = Field(
         default=None,
         description="Draft PR URL if opened",
+    )
+    pr_number: Optional[int] = Field(
+        default=None,
+        description="Draft PR number if opened",
     )
     branch_name: Optional[str] = Field(
         default=None,
