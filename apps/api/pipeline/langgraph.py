@@ -465,7 +465,7 @@ async def verify_node(
             test_paths=["apps/api/tests/"],
             timeout=300,
         )
-    except Exception as e:
+    except Exception:
         # Fallback to host runner if sandbox helper unavailable
         try:
             full_suite = await pytest_runner.run_suite(
