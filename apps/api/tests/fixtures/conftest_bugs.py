@@ -4,11 +4,9 @@ Provides demo repo structure, bug instances, and test data for
 integration testing of the LangGraph pipeline.
 """
 
-import json
-from pathlib import Path
-from apps.api.demo_bugs.calculations.calculations import calculate_discount
-from apps.api.demo_bugs.validation.validate_age import validate_age
-from apps.api.demo_bugs.profiles.get_user_profile import get_user_profile
+from demo_bugs.calculations.calculations import calculate_discount
+from demo_bugs.profiles.get_user_profile import get_user_profile
+from demo_bugs.validation.validate_age import validate_age
 
 
 # Demo repo metadata
@@ -89,7 +87,7 @@ INVALID_INPUTS = [None, "", -1, -100]
 REPRODUCTION_TEST_SCRIPTS = {
     "calculate_discount": '''"\"\"\"Reproduction test for off-by-one bug in calculate_discount.\"\"\"
 def test_calculate_discount_off_by_one():
-    from apps.api.demo_bugs.calculations.calculations import calculate_discount
+    from demo_bugs.calculations.calculations import calculate_discount
     result = calculate_discount(100, 10)
     # Buggy: returns wrong value due to off-by-one formula
     # Correct: should be 90.0
@@ -97,7 +95,7 @@ def test_calculate_discount_off_by_one():
 ''',
     "validate_age": '''"\"\"\"Reproduction test for wrong boundary bug in validate_age.\"\"\"
 def test_validate_age_wrong_boundary():
-    from apps.api.demo_bugs.validation.validate_age import validate_age
+    from demo_bugs.validation.validate_age import validate_age
     result = validate_age(18)
     # Buggy: returns False due to age > 18 instead of age >= 18
     # Correct: should be True for age 18
@@ -105,7 +103,7 @@ def test_validate_age_wrong_boundary():
 ''',
     "get_user_profile": '''"\"\"\"Reproduction test for missing null check bug in get_user_profile.\"\"\"
 def test_get_user_profile_null_check():
-    from apps.api.demo_bugs.profiles.get_user_profile import get_user_profile
+    from demo_bugs.profiles.get_user_profile import get_user_profile
     result = get_user_profile(None)
     # Buggy: raises TypeError due to missing null check
     # Correct: should return None
