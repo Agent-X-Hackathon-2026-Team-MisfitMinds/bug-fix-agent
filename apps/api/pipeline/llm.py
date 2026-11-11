@@ -90,7 +90,11 @@ class LLMWrapper:
         cache: Optional[PromptCache] = None,
     ):
         self.provider = provider
-        self.api_key = api_key or os.environ.get("GEMINI_API_KEY", "")
+        from config import get_settings
+
+        settings = get_settings()
+        self.api_key = api_key or settings.gemini_api_key
+        self.model_name = settings.gemini_model
         self.cache = cache or PromptCache()
         self._rate_limit_time = 0.0
         self._rate_limit_seconds = 60  # Default 60s cooldown
@@ -193,10 +197,9 @@ class LLMWrapper:
 
         try:
             model = genai.GenerativeModel(  # type: ignore[attr-defined]
-                model_name="gemini-1.5-flash"
+                model_name=self.model_name
             )
 
-            # Safety settings to allow reasonable content
             safety_settings = [
                 {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
                 {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
@@ -204,9 +207,14 @@ class LLMWrapper:
                 {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
             ]
 
-            response = model.generate_content(
-                prompt,
-                safety_settings=safety_settings,  # type: ignore[arg-type]
+            import asyncio
+
+            response = await asyncio.wait_for(
+                model.generate_content_async(
+                    prompt,
+                    safety_settings=safety_settings,  # type: ignore[arg-type]
+                ),
+                timeout=60,
             )
 
             text = response.text
@@ -286,7 +294,7 @@ class LLMWrapper:
             body = issue_data.get("body", "")
             expected = issue_data.get("expected_response", "")
             if title and body:
-                self.cache.set(title, body, prompt_version="rehearsed", result=expected)
+                self.cache.set(title, body, prompt_version="v1", result=expected)
 
 
 # Default instance for use across the project
