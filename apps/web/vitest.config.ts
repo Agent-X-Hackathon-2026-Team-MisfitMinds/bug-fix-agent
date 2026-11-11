@@ -1,6 +1,6 @@
-import { defineConfig } from 'vitest/config';
-import path from 'node:path';
+import {defineConfig} from 'vitest/config';
+import {fileURLToPath} from 'node:url';
 export default defineConfig({
-  resolve: { alias: { '@': path.resolve(__dirname, 'src') } },
-  test: { include: ['tests/**/*.test.ts'], pool: 'forks', poolOptions: { forks: { singleFork: true } } },
+  resolve:{alias:{'@':fileURLToPath(new URL('./src',import.meta.url))}},
+  test:{include:['tests/**/*.test.ts'],pool:'forks',maxWorkers:1},
 });
