@@ -6,6 +6,7 @@ import {Button,Card,EmptyState,Skeleton,StatusBadge,Toast} from '../src/componen
 describe('Button',()=>{
   it('renders a non-submit action by default',()=>{const html=renderToStaticMarkup(h(Button,{},'Retry'));expect(html).toContain('type="button"');expect(html).toContain('Retry')});
   it('supports a primary button and native disabled state',()=>{const html=renderToStaticMarkup(h(Button,{variant:'primary',disabled:true},'Continue'));expect(html).toContain('primary');expect(html).toContain('disabled=""')});
+  it('renders a danger action',()=>{const html=renderToStaticMarkup(h(Button,{variant:'danger'},'Delete'));expect(html).toContain('ui-button-danger')});
   it('prevents repeat actions while loading and exposes busy state',()=>{const html=renderToStaticMarkup(h(Button,{loading:true},'Loading…'));expect(html).toContain('disabled=""');expect(html).toContain('aria-busy="true"')});
 });
 describe('Card',()=>{
@@ -19,8 +20,8 @@ describe('EmptyState',()=>{
   it('escapes untrusted text',()=>{const html=renderToStaticMarkup(h(EmptyState,{title:'<script>alert(1)</script>'},'Text'));expect(html).not.toContain('<script>');expect(html).toContain('&lt;script&gt;')});
 });
 describe('Toast',()=>{
-  it('uses a status announcement for information',()=>expect(renderToStaticMarkup(h(Toast,{},'Saved'))).toContain('role="status"'));
-  it('uses an alert announcement for an error',()=>expect(renderToStaticMarkup(h(Toast,{tone:'error'},'Try again'))).toContain('role="alert"'));
+  it('uses a status announcement for information',()=>expect(renderToStaticMarkup(h(Toast,{onDismiss:()=>{}},'Saved'))).toContain('role="status"'));
+  it('uses an alert announcement for an error',()=>expect(renderToStaticMarkup(h(Toast,{tone:'error',onDismiss:()=>{}},'Try again'))).toContain('role="alert"'));
 });
 describe('StatusBadge',()=>{
   it('renders each supported tone and keeps the status in text',()=>{for(const tone of ['neutral','success','warning','error'] as const){const html=renderToStaticMarkup(h(StatusBadge,{label:`Status ${tone}`,tone}));expect(html).toContain(`Status ${tone}`);if(tone==='error'||tone==='warning')expect(html).toContain(tone)}});

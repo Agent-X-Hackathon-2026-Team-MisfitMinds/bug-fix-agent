@@ -40,7 +40,7 @@ test('dashboard lists runs, handles pagination failure, and does not invent PRs'
   await expect(page.locator('tr').filter({hasText:run.issue_title}).getByText('Completed',{exact:true})).toBeVisible();
   await expect(page.getByRole('link',{name:/View draft PR/})).toHaveCount(0);
   await page.getByRole('button',{name:'Load more'}).click();
-  await expect(page.locator('.notice[role=alert]')).toContainText("Couldn't load more runs");await expect(page.getByText(run.issue_title)).toBeVisible();
+  await expect(page.getByRole('alert').filter({hasText:"Couldn't load more runs"})).toBeVisible();await expect(page.getByText(run.issue_title)).toBeVisible();
 });
 
 test('offline dashboard retains already loaded data',async({page,context})=>{

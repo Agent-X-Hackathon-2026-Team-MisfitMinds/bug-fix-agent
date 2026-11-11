@@ -53,3 +53,18 @@
 
 /* Reusable action focus and touch target. */
 .ui-button{min-width:44px;min-height:44px}.ui-button:focus-visible{outline:2px solid var(--ds-border-focus,var(--ds-brand));outline-offset:2px}
+
+/* Scoped reusable component states; other app buttons keep their existing styling. */
+.ui-button:not(:disabled):active{transform:scale(.98)}
+.ui-button:disabled:hover{background:var(--ds-panel)}
+.ui-button.primary:disabled:hover{background:#0e6b6b}
+.ui-button.ui-button-danger{background:#a51d34;border-color:#a51d34;color:#fff}
+.ui-button.ui-button-danger:not(:disabled):hover{background:#821528;border-color:#821528}
+.ui-toast{position:fixed;right:16px;bottom:16px;z-index:1000;display:flex;align-items:center;gap:12px;max-width:min(420px,calc(100vw - 32px));padding:12px 12px 12px 16px;border:1px solid var(--ds-border);border-radius:14px;background:var(--ds-panel);color:var(--ds-text-primary);box-shadow:var(--ds-shadow)}
+.ui-toast-error{border-color:var(--ds-error)}
+.ui-toast:hover,.ui-toast:focus-within{border-color:var(--ds-brand)}
+.ui-toast-dismiss{flex:none;display:grid;place-items:center;min-width:44px;min-height:44px;border:1px solid var(--ds-border);border-radius:10px;background:var(--ds-panel);color:var(--ds-text-primary);font-size:22px;line-height:1}
+.ui-toast-dismiss:hover{background:var(--ds-elev)}
+.ui-toast-dismiss:focus-visible{outline:2px solid var(--ds-border-focus,var(--ds-brand));outline-offset:2px}
+@media(prefers-reduced-motion:reduce){.ui-button:not(:disabled):active{transform:none}}
+.ui-button.ui-button-danger:disabled:hover{background:#a51d34}
