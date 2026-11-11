@@ -13,7 +13,9 @@ test('theme follows system preference and user choice persists after refresh',as
   await page.reload();await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
 });
 
-test('keyboard can navigate the app shell with a visible focus indicator',async({page})=>{
+test('keyboard can navigate the app shell with a visible focus indicator',async({page,browserName})=>{
+  // Windows Playwright WebKit skips ordinary links during Tab navigation.
+  test.skip(browserName==='webkit'&&process.platform==='win32','Windows WebKit skips links on Tab; see frontend setup notes.');
   await page.goto('/workspace');
   const repo=page.getByRole('navigation',{name:'App navigation'}).getByRole('link',{name:'Repositories'});
   for(let i=0;i<12;i++){if(await repo.evaluate(el=>el===document.activeElement))break;await page.keyboard.press('Tab')}

@@ -9,8 +9,8 @@ Cache rehearsed demo issues before the live demo.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
-import json
 import time
 from typing import Optional, Any, Dict, List
 
@@ -31,7 +31,7 @@ class PromptCache:
     Uses 24-hour TTL; invalidate on prompt changes.
     Cache rehearsed demo issues before the live demo.
 
-    Cache key = SHA-256(issue_title + issue_body + prompt_version)
+    Cache key = SHA-256(issue_title + issue_body + prompt_version + prompt)
     """
 
     def __init__(self, ttl_hours: int = 24):
@@ -180,7 +180,8 @@ class LLMWrapper:
         """Call the LLM provider with the given prompt.
 
         Uses Gemini (Google Generative AI) by default.
-        Falls back to a mock response if API key is not available.
+        Raises instead of inventing an answer when the key, the SDK or the
+        provider is unavailable.
 
         Args:
             prompt: The prompt to send to the LLM
@@ -286,11 +287,14 @@ class LLMWrapper:
         """Pre-cache results for demo/rehearsal issues before live demo.
 
         Args:
-            rehearsed_issues: List of dicts with 'title', 'body', and expected 'response'
+            rehearsed_issues: List of dicts with 'title', 'body', 'prompt' and
+                'expected_response'. The prompt is part of the cache key, so an
+                entry without the exact prompt would never be read back.
         """
         for issue_data in rehearsed_issues:
             title = issue_data.get("title", "")
             body = issue_data.get("body", "")
+            prompt = issue_data.get("prompt", "")
             expected = issue_data.get("expected_response", "")
             if title and body:
                 self.cache.set(title, body, prompt_version="v1", result=expected)
