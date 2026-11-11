@@ -17,6 +17,9 @@
 | Issue #2 | Wrong boundary in `validate_age` | Draft PR with red→green proof | Medium |
 | Issue #3 | Missing null check in `get_user_profile` | Honest "couldn't reproduce" comment | Low / null |
 
+Exact issue titles and bodies, known fixes and reference tests: `docs/19-seeded-demo-reference.md`.
+Issue #3 is filed with deliberately thin text; that is why it ends in "couldn't reproduce".
+
 ---
 
 ## Demo rehearsal script (step-by-step)
@@ -25,6 +28,7 @@
 - [ ] Production URL live: `curl -sf https://<domain>/` → 200
 - [ ] `/auth/session` → 200 or 401 (not 5xx)
 - [ ] LLM free-tier cache warmed for rehearsed issues (Durgesh)
+- [ ] Seeded repo verified: `python scripts/demo/verify_seeded_repo.py` → all checks passed
 - [ ] Docker sandbox prebuilt with dependencies (Yash)
 - [ ] Recorded backup run ready (in case of LLM rate limits)
 - [ ] Dashboard accessible: `https://<domain>/dashboard`
@@ -35,7 +39,7 @@
 |------|--------|-----------------|-----------|
 | 1 | Open production URL | Home page loads | |
 | 2 | Sign in with GitHub OAuth | Dashboard renders, signed in | |
-| 3 | Navigate to seeded demo repo | 3 issues visible with `agent-fix` label | |
+| 3 | Navigate to seeded demo repo | 3 issues open, none carrying `agent-fix` yet | |
 | 4 | Label issue #1 (`calculate_discount`) | Run appears on dashboard, SSE timeline starts | |
 | 5 | Watch all 6 SSE steps | read → reproduce → diagnose → fix → verify → pr | |
 | 6 | Verify red→green proof | Test output shows FAILED → PASSED | |
