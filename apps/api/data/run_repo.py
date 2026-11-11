@@ -43,6 +43,12 @@ class RunRepo:
         self._runs: dict[UUID, Run] = {}
         self._steps: dict[UUID, list[RunStep]] = {}
 
+    def get_by_id(self, run_id):
+        return self._runs.get(run_id)
+
+    def get_steps_by_id(self, run_id):
+        return list(self._steps.get(run_id, []))
+
     def create(self, *, installation_id: int, repository_full_name: str, issue_number: int,
                issue_title: str, issue_body: str, triggered_by: str) -> Run:
         now = _now()
