@@ -10,11 +10,15 @@ Cache rehearsed demo issues before the live demo.
 from __future__ import annotations
 
 import hashlib
+import json
 import time
 import os
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
-import google.generativeai as genai
+try:
+    import google.generativeai as genai
+except ImportError:  # pragma: no cover - optional dependency
+    genai = None
 
 
 class RateLimitError(Exception):
@@ -166,7 +170,7 @@ class LLMWrapper:
 
         # If node_name is provided, also cache with "rehearsed" version for future use
         # and optionally prepend template-based guidance
-        if node_name and node_name in self.PROMPT_TEMPLATES:
+        if node_name and node_name in PROMPT_TEMPLATES:
             # Could prepend template guidance, but for now just cache
             pass
 
@@ -187,8 +191,8 @@ class LLMWrapper:
         Raises:
             RateLimitError: If rate limited by provider
         """
-        if not self.api_key:
-            # No API key available - return mock response for development
+        if not self.api_key or genai is None:
+            # No API key or dependency available - return mock response for development
             return self._mock_llm_response(prompt)
 
         try:
@@ -209,7 +213,7 @@ class LLMWrapper:
                 safety_settings=safety_settings,
             )
 
-            text = response.text
+            text: str = response.text
             if text:
                 return text
             else:
