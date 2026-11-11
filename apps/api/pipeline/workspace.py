@@ -10,7 +10,7 @@ def repo_structure(workspace: Path) -> dict[str, Any]:
     files = []
     for p in workspace.rglob("*"):
         if p.is_file():
-            files.append(p.relative_to(workspace).as_posix())
+            files.append(str(p.relative_to(workspace)).as_posix())
     return {"root": str(workspace), "files": files}
 
 

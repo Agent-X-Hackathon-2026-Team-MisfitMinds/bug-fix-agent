@@ -1,6 +1,5 @@
 """Pipeline runner entry point discovered by main.py at startup."""
 
-from typing import cast
 from uuid import UUID
 
 from main import app
@@ -17,7 +16,7 @@ NOT_AVAILABLE = "diagnosis not available in this build"
 
 
 def _repo() -> RunRepo:
-    return cast(RunRepo, app.state.run_repo)
+    return app.state.run_repo
 
 
 async def handle_run(run_id: UUID) -> None:

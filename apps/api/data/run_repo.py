@@ -43,16 +43,13 @@ class RunRepo:
         self._runs: dict[UUID, Run] = {}
         self._steps: dict[UUID, list[RunStep]] = {}
 
-    def get_by_id(self, run_id: UUID) -> Run:
-        """Worker accessor: runs are looked up by id, without an HTTP caller."""
+    def get_by_id(self, run_id):
         run = self._runs.get(run_id)
         if run is None:
             raise NotFoundError("Run not found")
         return run
 
-    def get_steps_by_id(self, run_id: UUID) -> list[RunStep]:
-        """Worker accessor for a run's steps; validates that the run exists."""
-        self.get_by_id(run_id)
+    def get_steps_by_id(self, run_id):
         return list(self._steps.get(run_id, []))
 
     def create(self, *, installation_id: int, repository_full_name: str, issue_number: int,
