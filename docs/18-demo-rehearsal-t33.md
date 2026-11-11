@@ -14,11 +14,11 @@
 | Issue | Bug type | Expected outcome | Confidence |
 |-------|----------|-----------------|------------|
 | Issue #1 | Off-by-one in `calculate_discount` | Draft PR with red→green proof | High |
-| Issue #2 | Wrong boundary in `validate_age` | Draft PR with red→green proof | Medium |
-| Issue #3 | Missing null check in `get_user_profile` | Honest "couldn't reproduce" comment | Low / null |
+| Issue #4 | Wrong boundary in `validate_age` | Draft PR with red→green proof | Medium |
+| Issue #5 | Missing null check in `get_user_profile` | Honest "couldn't reproduce" comment | Low / null |
 
 Exact issue titles and bodies, known fixes and reference tests: `docs/19-seeded-demo-reference.md`.
-Issue #3 is filed with deliberately thin text; that is why it ends in "couldn't reproduce".
+Issue #5 is filed with deliberately thin text; that is why it ends in "couldn't reproduce".
 
 ---
 
@@ -45,9 +45,9 @@ Issue #3 is filed with deliberately thin text; that is why it ends in "couldn't 
 | 6 | Verify red→green proof | Test output shows FAILED → PASSED | |
 | 7 | Verify root-cause notes | Plain-English explanation visible | |
 | 8 | Open draft PR | PR link visible, draft status | |
-| 9 | Label issue #2 (`validate_age`) | Run appears, all 6 steps stream | |
+| 9 | Label issue #4 (`validate_age`) | Run appears, all 6 steps stream | |
 | 10 | Verify red→green proof | Test output shows FAILED → PASSED | |
-| 11 | Label issue #3 (`get_user_profile`) | Run appears | |
+| 11 | Label issue #5 (`get_user_profile`) | Run appears | |
 | 12 | Verify "couldn't reproduce" | Honest comment posted, confidence null | |
 | 13 | Verify dashboard shows all 3 runs | All 3 runs visible end-to-end | |
 
@@ -62,8 +62,8 @@ Issue #3 is filed with deliberately thin text; that is why it ends in "couldn't 
 
 If LLM free-tier rate limits interrupt the live demo:
 - [ ] Pre-recorded video of all 3 seeded issues → draft PRs
-- [ ] Video shows red→green proof for issues #1 and #2
-- [ ] Video shows "couldn't reproduce" for issue #3
+- [ ] Video shows red→green proof for issues #1 and #4
+- [ ] Video shows "couldn't reproduce" for issue #5
 - [ ] Video shows dashboard with all 3 runs
 - [ ] Backup video cued and ready to play
 

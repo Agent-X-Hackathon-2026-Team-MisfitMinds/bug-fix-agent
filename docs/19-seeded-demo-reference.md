@@ -38,12 +38,22 @@ Works on a temporary copy. Passes only if the baseline suite is green and, for e
 reference test is red before the known fix and the reference test plus the full suite are green
 after it. Last result (local, 2026-11-11): 13 checks, all passed.
 
-## GitHub issues to create on `seeded-demo-repo`
+## GitHub issues on `seeded-demo-repo`
 
-Create all three **without** the `agent-fix` label. The label is added live during rehearsal or the
-demo; adding it is the one user action that starts a run.
+Created 2026-11-11, all open and **without** the `agent-fix` label. The label is added live during
+rehearsal or the demo; adding it is the one user action that starts a run.
 
-### Issue 1
+| Bug | GitHub issue | Reference test |
+|-----|--------------|----------------|
+| 1 off-by-one | #1 | `scripts/demo/reference/test_issue_1.py` |
+| 2 wrong boundary | #4 | `scripts/demo/reference/test_issue_2.py` |
+| 3 missing null check | #5 | `scripts/demo/reference/test_issue_3.py` |
+
+Issue numbers are not 1, 2, 3 because #2 and #3 on that repository are pull requests. Reference
+test file names follow the bug number, not the issue number. If an issue is edited on GitHub, keep
+the text below in sync.
+
+### Bug 1 → GitHub issue #1
 
 **Title:** `calculate_discount returns 1 more than the discounted price`
 
@@ -58,7 +68,7 @@ Actual behaviour: returns 81.
 Every result is exactly 1 too high, for example calculate_discount(200, 10) returns 181 instead of 180.
 ```
 
-### Issue 2
+### Bug 2 → GitHub issue #4
 
 **Title:** `validate_age rejects age 65 although the range is 18 to 65 inclusive`
 
@@ -73,7 +83,7 @@ Actual behaviour: returns False.
 validate_age(64) returns True and validate_age(66) returns False, so only the upper boundary is wrong.
 ```
 
-### Issue 3 (deliberately thin)
+### Bug 3 → GitHub issue #5 (deliberately thin)
 
 **Title:** `Profile page sometimes breaks`
 
