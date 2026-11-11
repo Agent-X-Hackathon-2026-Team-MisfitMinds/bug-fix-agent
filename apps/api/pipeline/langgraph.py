@@ -23,8 +23,11 @@ class RunStatus(str, Enum):
     """Current run status - must match TS RunStatus."""
     pending = "pending"
     reproducing = "reproducing"
+    diagnosing = "diagnosing"
     fixing = "fixing"
     verifying = "verifying"
+    verified = "verified"
+    pr_open = "pr_open"
     completed = "completed"
     failed = "failed"
     could_not_reproduce = "could_not_reproduce"
@@ -134,6 +137,7 @@ class RunState(BaseModel):
         default=None,
         description="Git branch name where patch was applied",
     )
+    comment: Optional[str] = Field(default=None, description="Comment to post on the issue")
 
     # Metadata
     retry_count: int = Field(
@@ -669,9 +673,8 @@ async def pr_node(
     pr_body = _generate_pr_body(state)
 
     # Create branch name
-    branch_name = f"agent/fix-{state.issue_id}-{hashlib.sha256(
-        (state.root_cause or "unknown").encode()
-    ).hexdigest()[:8]}"
+    _hash = hashlib.sha256((state.root_cause or "unknown").encode()).hexdigest()[:8]
+    branch_name = f"agent/fix-{state.issue_id}-{_hash}"
 
     # Push branch and open draft PR via GitHub API (Yash's integration)
     try:
