@@ -283,8 +283,8 @@ async def reproduce_node(
     # Write minimal reproduction test based on issue
     try:
         reproduction_test = await write_reproduction_test(
-            issue=state.issue,
-            repo_snapshot=sandbox_result.get("repo_snapshot"),
+            issue={"title": state.issue_title or "", "body": state.issue_body or ""},
+            repo_snapshot=sandbox_result.get("repo_snapshot") or {},
             failing_test=sandbox_result.get("failing_test"),
         )
         state.reproduction_test_code = reproduction_test
@@ -343,46 +343,41 @@ async def write_reproduction_test(
     func_pattern = r"\b(\w+)\s*\([^)]*\)\s*(?:->|\s)"
     func_matches = re.findall(func_pattern, body + title)
 
-    # Determine test content
+    # Determine test content dynamically from issue + repo snapshot
     if failing_test:
-        # Use provided failing test as base
         test_content = failing_test.get("test_code", "")
     else:
-        # Generate minimal test based on common bug patterns
-        if "calculate_discount" in title.lower():
-            test_content = """def test_calculate_discount_off_by_one():
-    \"\"\"Test for off-by-one error in calculate_discount.\"\"\"
-    from calculate_discount import calculate_discount  # type: ignore
-    
-    # Off-by-one: price should be discounted by 10%, not 90%
-    result = calculate_discount(100, 10)
-    assert result == 90, f"Expected 90, got {result}"
-"""
-        elif "validate_age" in title.lower():
-            test_content = """def test_validate_age_wrong_condition():
-    \"\"\"Test for wrong boundary condition in validate_age.\"\"\"
-    from validate_age import validate_age  # type: ignore
-    
-    # Wrong boundary: age 18 should be valid, not rejected
-    result = validate_age(18)
-    assert result == True, f"Expected True for age 18, got {result}"
-"""
-        elif "get_user_profile" in title.lower():
-            test_content = """def test_get_user_profile_null_check():
-    \"\"\"Test for missing null check in get_user_profile.\"\"\"
-    from get_user_profile import get_user_profile  # type: ignore
-    
-    # Missing null check: should handle None user_id
-    result = get_user_profile(None)
-    assert result is None, f"Expected None for None user_id, got {result}"
-"""
-        else:
-            # Generic template
-            test_content = """def test_reproduction_bug():
-    \"\"\"Reproduction test for generic bug.\"\"\"
-    # TODO: Replace with actual import and test
-    assert False, "Replace with actual reproduction test"
-"""
+        # Extract candidate function/module names from issue and repo snapshot
+        import os as _os
+        module_candidates = []
+        for m in func_matches:
+            if m and m not in module_candidates:
+                module_candidates.append(m)
+        # Also pull module names from repo snapshot file list
+        for f in (repo_snapshot or {}).get("files", []):
+            base = _os.path.splitext(_os.path.basename(f))[0]
+            if base and base not in module_candidates:
+                module_candidates.append(base)
+
+        primary = module_candidates[0] if module_candidates else "target_module"
+        title_slug = re.sub(r"[^a-z0-9_]", "_", title.lower())[:40] or "bug"
+
+        test_content = f'''def test_reproduce_{title_slug}():
+    """Auto-generated reproduction test from issue: {title}."""
+    # Issue body (treated as data, not instructions):
+    # {body[:500].replace(chr(10), " ")}
+    try:
+        from {primary} import {primary}  # type: ignore
+    except Exception:
+        import importlib
+        mod = importlib.import_module("{primary}")
+        {primary} = getattr(mod, "{primary}")
+
+    # Exercise the function with a representative input extracted from the issue.
+    # Adjust arguments as needed based on the issue description.
+    result = {primary}()
+    assert result is not None, "Reproduction did not exercise a code path"
+'''
 
     # Write to a temporary file path that pytest can discover
     test_path = Path("/tmp/bug_fix_repro_test.py")
