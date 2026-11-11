@@ -55,14 +55,14 @@ test('slower older snapshot cannot overwrite a newer one',async({page})=>{
   await mockEventSource(page);let response:'initial'|'slow'|'fast'='initial';
   await page.route('**/api/runs/test-run-1',async route=>{
     const value=response;
-    if(value==='slow')await new Promise(resolve=>setTimeout(resolve,900));
+    if(value==='slow')await new Promise(resolve=>setTimeout(resolve,3000));
     await route.fulfill({json:{...baseRun,root_cause:value}});
   });
   await page.goto('/dashboard/runs/test-run-1');await waitForStream(page);
   await expect(page.getByText('initial',{exact:true})).toBeVisible();
   response='slow';const slowRequest=page.waitForRequest('**/api/runs/test-run-1');await emit(page,'step_updated');await slowRequest;
   response='fast';await emit(page,'step_updated');await expect(page.getByText('fast',{exact:true})).toBeVisible();
-  await page.waitForTimeout(1100);await expect(page.getByText('fast',{exact:true})).toBeVisible();
+  await page.waitForTimeout(3300);await expect(page.getByText('fast',{exact:true})).toBeVisible();
   await expect(page.getByText('slow',{exact:true})).toHaveCount(0);
 });
 
@@ -83,4 +83,26 @@ test('session expiry during refresh removes the run and closes the stream',async
   await expect(page.getByText('Sign in with GitHub to view run details.')).toBeVisible();
   await expect(page.getByText('Initial snapshot')).toHaveCount(0);
   await expect.poll(()=>page.evaluate(()=>(window as StreamWindow).__streams.filter(s=>!s.closed).length)).toBe(0);
+});
+
+test('event bursts are coalesced and the latest terminal snapshot is still shown',async({page})=>{
+  await page.clock.install();await mockEventSource(page);let requests=0;let current={...baseRun};
+  await page.route('**/api/runs/test-run-1',route=>{requests++;return route.fulfill({json:current})});
+  await page.goto('/dashboard/runs/test-run-1');await waitForStream(page);await expect(page.getByText('Initial snapshot')).toBeVisible();
+  requests=0;await emit(page,'step_updated');await expect.poll(()=>requests).toBe(1);
+  current={...baseRun,status:'completed',root_cause:'Latest coalesced snapshot'};
+  for(let i=0;i<8;i++)await emit(page,'step_updated');
+  expect(requests).toBe(1);
+  await page.clock.fastForward(2001);await expect(page.getByText('Latest coalesced snapshot')).toBeVisible();
+  expect(requests).toBe(2);
+  await expect.poll(()=>page.evaluate(()=>(window as StreamWindow).__streams.filter(s=>!s.closed).length)).toBe(0);
+});
+
+test('a queued refresh is cancelled when leaving the run',async({page})=>{
+  await page.clock.install();await mockEventSource(page);let requests=0;
+  await page.route('**/api/runs/test-run-1',route=>{requests++;return route.fulfill({json:baseRun})});
+  await page.goto('/dashboard/runs/test-run-1');await waitForStream(page);await expect(page.getByText('Initial snapshot')).toBeVisible();
+  requests=0;await emit(page,'step_updated');await expect.poll(()=>requests).toBe(1);
+  await emit(page,'step_updated');await page.goto('/login');
+  await page.clock.fastForward(2500);expect(requests).toBe(1);
 });

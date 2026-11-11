@@ -19,6 +19,22 @@ const load=useCallback(async(initial=false)=>{const request=++requestSeq.current
 useEffect(()=>{void load(true);const on=()=>setOffline(!navigator.onLine);on();window.addEventListener('online',on);window.addEventListener('offline',on);return()=>{requestSeq.current++;window.removeEventListener('online',on);window.removeEventListener('offline',on)}},[load]);
 const active=!!run&&!['completed','failed','could_not_reproduce'].includes(run.status);
 // Named SSE events trigger an authoritative snapshot fetch; payloads are not trusted as state.
-useEffect(()=>{if(view!=='ready'||!active)return;let closed=false;setConnected(false);const es=new EventSource(`/api/runs/${encodeURIComponent(id)}/events`);es.onopen=()=>{if(!closed){setConnected(true);void load()}};es.onerror=()=>{if(!closed)setConnected(false)};const refresh=()=>{if(!closed)void load()};es.addEventListener('step_updated',refresh);es.addEventListener('run_status_changed',refresh);return()=>{closed=true;es.close()}},[view,id,active,load]);
+useEffect(()=>{
+  if(view!=='ready'||!active)return;
+  let closed=false;let nextAllowed=0;let timer:ReturnType<typeof setTimeout>|null=null;
+  setConnected(false);
+  const es=new EventSource(`/api/runs/${encodeURIComponent(id)}/events`);
+  // Coalesce event bursts per open run; keep a trailing refresh so the latest state is not lost.
+  const refresh=()=>{
+    if(closed)return;
+    const wait=Math.max(0,nextAllowed-Date.now());
+    if(wait===0){if(timer!==null){clearTimeout(timer);timer=null}nextAllowed=Date.now()+2000;void load();return}
+    if(timer===null)timer=setTimeout(()=>{timer=null;if(!closed){nextAllowed=Date.now()+2000;void load()}},wait);
+  };
+  es.onopen=()=>{if(!closed){setConnected(true);refresh()}};
+  es.onerror=()=>{if(!closed)setConnected(false)};
+  es.addEventListener('step_updated',refresh);es.addEventListener('run_status_changed',refresh);
+  return()=>{closed=true;if(timer!==null)clearTimeout(timer);es.close()};
+},[view,id,active,load]);
 async function retry(){if(!navigator.onLine){setMessageTone('error');setMessage('You’re offline.');return}setWorking(true);setMessage('');if(!retryKey.current)retryKey.current=crypto.randomUUID();try{await api(`/runs/${encodeURIComponent(id)}/retry`,{method:'POST',headers:{'Idempotency-Key':retryKey.current}});retryKey.current=null;setMessageTone('info');setMessage('Retry queued.');await load()}catch(e){if(e instanceof ApiError&&e.status!==429&&e.status<500)retryKey.current=null;if(e instanceof ApiError&&[401,403,404].includes(e.status)){requestSeq.current++;setRun(null);setMessage('');setRefreshError(false);setView(e.status===401?'signedout':e.status===403?'forbidden':'missing')}else{setMessageTone('error');setMessage('Couldn’t retry this run. Try again.')}}finally{setWorking(false)}}
 return <div className="wrap page"><Link href="/dashboard" className="text-link">← All runs</Link><div className="page-intro" style={{marginTop:25}}><span className="eyebrow">RUN DETAILS</span><h1>{run?.issue_title||'Run details'}</h1>{run&&<p>{run.repository_full_name} · Issue #{run.issue_number}</p>}</div>{offline&&<div className="notice" role="status">You’re offline. If you already loaded a timeline, it remains visible on this page. Live updates will reconnect when available.</div>}{message&&<Toast key={message} tone={messageTone} onDismiss={()=>setMessage('')}>{message}</Toast>}{refreshError&&view==='ready'&&<div className="notice" role="alert">Couldn’t refresh run data. <button className="text-link" onClick={()=>void load()}>Try again</button></div>}{view==='loading'&&<Skeleton label={`Loading run ${id}…`}/>}{view==='signedout'&&<div className="card"><h2>Sign in with GitHub to view run details.</h2><Link href="/login" className="button primary">Sign in with GitHub ↗</Link></div>}{view==='missing'&&<div className="card">No run found for {id}. <Link href="/dashboard" className="text-link">Back to dashboard</Link></div>}{view==='forbidden'&&<div className="card">You don’t have permission to view this run. <Link href="/dashboard" className="text-link">Back to dashboard</Link></div>}{view==='error'&&<Card><h2>Couldn’t load this run. Try again.</h2><Button onClick={()=>load(true)}>Try again</Button></Card>}{view==='ready'&&run&&<><div className="actions" style={{margin:'0 0 24px'}}><Badge status={run.status} prUrl={run.pr_url}/>{active&&<span className="muted" role="status">{connected?'● Live':'Reconnecting…'}</span>}{safeGithubUrl(run.pr_url)&&<GitHubLink url={run.pr_url}/>}</div><RunView run={run}/>{['failed','could_not_reproduce'].includes(run.status)&&<div className="actions"><Button loading={working} onClick={retry}>{working?'Retrying…':'Retry run'}</Button></div>}</>}</div>}
