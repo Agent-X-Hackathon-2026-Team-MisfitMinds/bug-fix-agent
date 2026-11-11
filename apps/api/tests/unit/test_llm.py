@@ -1,13 +1,13 @@
 """The Gemini REST wrapper must parse real payloads and never fake an answer."""
 import asyncio
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any
 
 import httpx
 import pytest
 
-from pipeline.llm import LLMWrapper, PromptCache, RateLimitError
+from pipeline.llm import LLMWrapper, PromptCache, RateLimitError, parse_fallback_models
 
 
 def gemini_reply(text: str) -> httpx.Response:
@@ -25,10 +25,12 @@ def make_wrapper(
     handler: Callable[[httpx.Request], httpx.Response],
     *,
     api_key: str = "test-key",
+    fallback_models: Sequence[str] = (),
 ) -> LLMWrapper:
     return LLMWrapper(
         api_key=api_key,
         model_name="test-model",
+        fallback_models=list(fallback_models),
         transport=httpx.MockTransport(handler),
         cache=PromptCache(),
     )
@@ -182,3 +184,138 @@ def test_rehearsed_answer_is_served_for_its_exact_prompt() -> None:
 
     assert ask(wrapper, "diagnose") == "rehearsed"
     assert calls == []
+
+
+def test_fallback_model_setting_is_parsed_as_csv() -> None:
+    assert parse_fallback_models("gemini-3.5-flash, gemini-2.5-flash") == [
+        "gemini-3.5-flash",
+        "gemini-2.5-flash",
+    ]
+    assert parse_fallback_models("") == []
+    assert parse_fallback_models(" , ") == []
+
+
+def test_healthy_first_model_never_touches_fallbacks() -> None:
+    paths: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        paths.append(request.url.path)
+        return gemini_reply("primary answer")
+
+    wrapper = make_wrapper(handler, fallback_models=["backup-model"])
+
+    assert ask(wrapper) == "primary answer"
+    assert paths == ["/v1beta/models/test-model:generateContent"]
+
+
+def test_5xx_falls_over_to_the_next_model() -> None:
+    paths: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        paths.append(request.url.path)
+        if request.url.path.endswith("test-model:generateContent"):
+            return httpx.Response(503, json={"error": {"message": "high demand"}})
+        return gemini_reply("recovered")
+
+    wrapper = make_wrapper(handler, fallback_models=["backup-model"])
+
+    assert ask(wrapper) == "recovered"
+    assert paths == [
+        "/v1beta/models/test-model:generateContent",
+        "/v1beta/models/backup-model:generateContent",
+    ]
+
+
+def test_timeout_falls_over_to_the_next_model() -> None:
+    paths: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        paths.append(request.url.path)
+        if request.url.path.endswith("test-model:generateContent"):
+            raise httpx.ConnectTimeout("model hung", request=request)
+        return gemini_reply("recovered after timeout")
+
+    wrapper = make_wrapper(handler, fallback_models=["backup-model"])
+
+    assert ask(wrapper) == "recovered after timeout"
+    assert paths == [
+        "/v1beta/models/test-model:generateContent",
+        "/v1beta/models/backup-model:generateContent",
+    ]
+
+
+def test_404_falls_over_to_the_next_model() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("test-model:generateContent"):
+            return httpx.Response(404, json={"error": {"message": "model not found"}})
+        return gemini_reply("fallback knows the answer")
+
+    wrapper = make_wrapper(handler, fallback_models=["backup-model"])
+
+    assert ask(wrapper) == "fallback knows the answer"
+
+
+def test_429_falls_over_to_a_model_with_quota_left() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("test-model:generateContent"):
+            return httpx.Response(
+                429, headers={"Retry-After": "3"}, json={"error": {"message": "quota"}}
+            )
+        return gemini_reply("quota recovered")
+
+    wrapper = make_wrapper(handler, fallback_models=["backup-model"])
+
+    assert ask(wrapper) == "quota recovered"
+
+
+def test_rate_limit_on_every_model_raises_rate_limit_error() -> None:
+    def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            429, headers={"Retry-After": "9"}, json={"error": {"message": "quota"}}
+        )
+
+    wrapper = make_wrapper(handler, fallback_models=["backup-model"])
+
+    with pytest.raises(RateLimitError) as caught:
+        ask(wrapper)
+    assert caught.value.retry_after == 9
+
+
+def test_400_fails_fast_without_trying_fallbacks() -> None:
+    paths: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        paths.append(request.url.path)
+        return httpx.Response(400, json={"error": {"message": "model is invalid"}})
+
+    wrapper = make_wrapper(handler, fallback_models=["backup-model"])
+
+    with pytest.raises(RuntimeError, match="model is invalid"):
+        ask(wrapper)
+    assert paths == ["/v1beta/models/test-model:generateContent"]
+
+
+def test_403_fails_fast_without_trying_fallbacks() -> None:
+    paths: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        paths.append(request.url.path)
+        return httpx.Response(403, json={"error": {"message": "permission denied"}})
+
+    wrapper = make_wrapper(handler, fallback_models=["backup-model"])
+
+    with pytest.raises(RuntimeError, match="permission denied"):
+        ask(wrapper)
+    assert paths == ["/v1beta/models/test-model:generateContent"]
+
+
+def test_all_models_failing_raises_the_last_error() -> None:
+    statuses = iter((503, 500))
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(next(statuses), json={"error": {"message": "down"}})
+
+    wrapper = make_wrapper(handler, fallback_models=["backup-model"])
+
+    with pytest.raises(RuntimeError, match="HTTP 500"):
+        ask(wrapper)

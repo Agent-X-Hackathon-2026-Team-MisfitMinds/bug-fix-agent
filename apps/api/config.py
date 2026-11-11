@@ -57,6 +57,10 @@ class Settings(BaseSettings):
         default="gemini-3.8-flash",
         validation_alias=AliasChoices("GEMINI_MODEL"),
     )
+    gemini_fallback_models: str = Field(
+        default="gemini-3.5-flash,gemini-2.5-flash",
+        validation_alias=AliasChoices("GEMINI_FALLBACK_MODELS"),
+    )
     cookie_secure: bool = True
     session_ttl_seconds: int = 86400
     oauth_state_ttl_seconds: int = 600

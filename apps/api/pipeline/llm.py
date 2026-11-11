@@ -3,6 +3,9 @@
 The provider is called over HTTPS with the existing ``httpx`` dependency; there
 is no LLM SDK to install. Responses are cached by a SHA-256 of the issue text
 and the exact prompt, so two different nodes can never share an answer.
+
+When the primary model is overloaded (5xx), unknown (404), rate limited (429)
+or unreachable (timeout), the wrapper fails over to GEMINI_FALLBACK_MODELS.
 """
 
 from __future__ import annotations
@@ -114,8 +117,13 @@ def extract_code(text: str) -> str:
     return candidate
 
 
+def parse_fallback_models(raw: str) -> list[str]:
+    """Split a comma separated GEMINI_FALLBACK_MODELS value into model names."""
+    return [model.strip() for model in raw.split(",") if model.strip()]
+
+
 class LLMWrapper:
-    """Gemini client with caching, JSON/code adapters and bounded failure."""
+    """Gemini client with caching, JSON/code adapters, failover and bounded failure."""
 
     def __init__(
         self,
@@ -123,6 +131,7 @@ class LLMWrapper:
         api_key: str | None = None,
         cache: PromptCache | None = None,
         model_name: str | None = None,
+        fallback_models: list[str] | None = None,
         base_url: str = GEMINI_BASE_URL,
         timeout: float = 60.0,
         transport: httpx.AsyncBaseTransport | None = None,
@@ -133,6 +142,11 @@ class LLMWrapper:
             api_key if api_key is not None else settings.gemini_api_key.get_secret_value()
         )
         self.model_name = model_name or settings.gemini_model
+        self.fallback_models = (
+            list(fallback_models)
+            if fallback_models is not None
+            else parse_fallback_models(settings.gemini_fallback_models)
+        )
         self.cache = cache or PromptCache()
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
@@ -246,67 +260,82 @@ class LLMWrapper:
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": generation_config,
         }
-        url = (
-            f"{self._base_url}/v1beta/models/{self.model_name}:generateContent"
-        )
-        try:
-            async with httpx.AsyncClient(
-                transport=self._transport, timeout=self._timeout
-            ) as client:
-                response = await client.post(
-                    url,
-                    headers={"x-goog-api-key": self.api_key},
-                    json=body,
-                )
-        except httpx.HTTPError as exc:
-            raise RuntimeError(f"Gemini request failed: {exc}") from exc
+        # Try the configured model first, then fall back when it is unavailable.
+        last_error: Exception | None = None
+        for model in [self.model_name, *self.fallback_models]:
+            url = f"{self._base_url}/v1beta/models/{model}:generateContent"
+            try:
+                async with httpx.AsyncClient(
+                    transport=self._transport, timeout=self._timeout
+                ) as client:
+                    response = await client.post(
+                        url,
+                        headers={"x-goog-api-key": self.api_key},
+                        json=body,
+                    )
+            except httpx.HTTPError as exc:
+                # Timeout or connection failure: this model is unreachable right now.
+                last_error = RuntimeError(f"Gemini request failed: {exc}")
+                continue
 
-        if response.status_code == 429:
-            retry_after = _retry_after(response)
-            raise RateLimitError(retry_after=retry_after)
-        if response.status_code >= 400:
-            detail = _error_detail(response)
-            if response.status_code == 404:
-                detail += f"; check GEMINI_MODEL={self.model_name!r}"
+            if response.status_code == 429:
+                # Quotas are per model, so another candidate may still have headroom.
+                last_error = RateLimitError(retry_after=_retry_after(response))
+                continue
+            if response.status_code in (400, 401, 403):
+                # Bad request or auth failure: every model would fail the same way.
+                raise RuntimeError(
+                    "Gemini request failed with HTTP "
+                    f"{response.status_code}: {_error_detail(response)}"
+                )
+            if response.status_code >= 400:
+                # 404 (unknown model) and 5xx (overloaded) are worth failing over.
+                last_error = RuntimeError(
+                    "Gemini request failed with HTTP "
+                    f"{response.status_code} for model {model!r}: "
+                    f"{_error_detail(response)}"
+                )
+                continue
+
+            try:
+                payload = response.json()
+            except ValueError as exc:
+                raise RuntimeError("Gemini returned a non-JSON response") from exc
+            if not isinstance(payload, dict):
+                raise RuntimeError("Gemini returned an unexpected response")
+            payload = cast(dict[str, Any], payload)
+
+            candidates = payload.get("candidates")
+            if isinstance(candidates, list) and candidates:
+                candidate = candidates[0]
+                if isinstance(candidate, dict):
+                    content = candidate.get("content")
+                    if isinstance(content, dict):
+                        parts = content.get("parts")
+                        if isinstance(parts, list):
+                            texts: list[str] = []
+                            for part in parts:
+                                if not isinstance(part, dict):
+                                    continue
+                                value = part.get("text")
+                                if isinstance(value, str):
+                                    texts.append(value)
+                            text = "".join(texts)
+                            if text.strip():
+                                return text
+            feedback = payload.get("promptFeedback")
+            if isinstance(feedback, dict) and feedback.get("blockReason"):
+                raise RuntimeError(f"Gemini blocked the prompt: {feedback['blockReason']}")
+            reason = ""
+            if isinstance(candidates, list) and candidates and isinstance(candidates[0], dict):
+                reason = str(candidates[0].get("finishReason") or "")
             raise RuntimeError(
-                f"Gemini request failed with HTTP {response.status_code}: {detail}"
+                "LLM returned an empty response" + (f" (finishReason: {reason})" if reason else "")
             )
 
-        try:
-            payload = response.json()
-        except ValueError as exc:
-            raise RuntimeError("Gemini returned a non-JSON response") from exc
-        if not isinstance(payload, dict):
-            raise RuntimeError("Gemini returned an unexpected response")
-        payload = cast(dict[str, Any], payload)
-
-        candidates = payload.get("candidates")
-        if isinstance(candidates, list) and candidates:
-            candidate = candidates[0]
-            if isinstance(candidate, dict):
-                content = candidate.get("content")
-                if isinstance(content, dict):
-                    parts = content.get("parts")
-                    if isinstance(parts, list):
-                        texts: list[str] = []
-                        for part in parts:
-                            if not isinstance(part, dict):
-                                continue
-                            value = part.get("text")
-                            if isinstance(value, str):
-                                texts.append(value)
-                        text = "".join(texts)
-                        if text.strip():
-                            return text
-        feedback = payload.get("promptFeedback")
-        if isinstance(feedback, dict) and feedback.get("blockReason"):
-            raise RuntimeError(f"Gemini blocked the prompt: {feedback['blockReason']}")
-        reason = ""
-        if isinstance(candidates, list) and candidates and isinstance(candidates[0], dict):
-            reason = str(candidates[0].get("finishReason") or "")
-        raise RuntimeError(
-            "LLM returned an empty response" + (f" (finishReason: {reason})" if reason else "")
-        )
+        if last_error is None:  # pragma: no cover - the first candidate always exists
+            raise RuntimeError("no Gemini model was tried")
+        raise last_error
 
     def cache_rehearsed_issues(self, rehearsed_issues: list[dict[str, str]]) -> None:
         """Pre-cache exact prompt/response pairs for a rehearsal."""
