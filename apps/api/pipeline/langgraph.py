@@ -7,9 +7,8 @@ Each node is small, testable, and follows the execution guide rules.
 from __future__ import annotations
 
 import hashlib
-import json
 from enum import Enum
-from typing import Optional, List, Dict, Any, Union
+from typing import Optional, List, Dict
 
 from pydantic import BaseModel, Field
 
@@ -325,19 +324,9 @@ async def write_reproduction_test(
     The test should FAIL before any fix is applied.
     """
     from pathlib import Path
-    import tempfile
 
-    # Get issue title and body for test context
+    # Get issue title for test context
     title = issue.get("title", "")
-    body = issue.get("body", "")
-
-    # Determine the likely file and function from issue or repo
-    # Heuristic: look for function names, module paths in issue body
-    import re
-
-    # Common patterns for off-by-one, wrong condition, missing null check
-    func_pattern = r"\b(\w+)\s*\([^)]*\)\s*(?:->|\s)"
-    func_matches = re.findall(func_pattern, body + title)
 
     # Determine test content
     if failing_test:
@@ -438,7 +427,6 @@ async def diagnose_node(
     # Log evidence summary
     state.evidence = evidence[:5]  # Cap at 5 pieces of evidence
 
-    step = PipelineStep.diagnose
     state.status = RunStatus.diagnosing
 
     return state
@@ -451,8 +439,6 @@ def determine_location(
 
     Uses heuristic matching against repo structure.
     """
-    import re
-
     # Common bug patterns and likely locations
     cause_lower = root_cause.lower()
 
@@ -635,7 +621,6 @@ async def verify_node(
     # Both checks passed - store after outputs
     state.after_test_output = full_suite.output
     state.after_exit_code = full_suite.exit_code
-    step = PipelineStep.verify
     state.status = RunStatus.verified
 
     return state
@@ -690,7 +675,6 @@ async def pr_node(
     # Store PR and branch info
     state.pr_url = github_result.get("pr_url")
     state.branch_name = branch_name
-    step = PipelineStep.pr
     state.status = RunStatus.pr_open
 
     return state

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import time
-from typing import Optional, Callable, Any, Dict, List
+from typing import Dict, List, Optional
 
 
 class RateLimitError(Exception):
@@ -32,7 +32,7 @@ class PromptCache:
     """
 
     def __init__(self, ttl_hours: int = 24):
-        self._cache: Dict[str, tuple[Any, float]] = {}
+        self._cache: Dict[str, tuple[str, float]] = {}
         self.ttl = ttl_hours * 3600  # Convert to seconds
 
     def _hash(self, issue_title: str, issue_body: str, prompt_version: str = "v1") -> str:
@@ -40,7 +40,7 @@ class PromptCache:
         combined = f"{issue_title}|{issue_body}|{prompt_version}"
         return hashlib.sha256(combined.encode()).hexdigest()
 
-    def get(self, issue_title: str, issue_body: str, prompt_version: str = "v1") -> Optional[Any]:
+    def get(self, issue_title: str, issue_body: str, prompt_version: str = "v1") -> Optional[str]:
         """Retrieve cached result if not expired.
 
         Returns cached result or None if not found/expired.
@@ -56,7 +56,7 @@ class PromptCache:
                 del self._cache[key]
         return None
 
-    def set(self, issue_title: str, issue_body: str, prompt_version: str = "v1", result: Any = None) -> None:
+    def set(self, issue_title: str, issue_body: str, prompt_version: str = "v1", result: str = "") -> None:
         """Store result with current timestamp."""
         key = self._hash(issue_title, issue_body, prompt_version)
         self._cache[key] = (result, time.time())
@@ -88,7 +88,7 @@ class LLMWrapper:
         self.provider = provider
         self.api_key = api_key or ""
         self.cache = cache or PromptCache()
-        self._rate_limit_time = 0
+        self._rate_limit_time: float = 0.0
         self._rate_limit_seconds = 60  # Default 60s cooldown
 
     def _check_rate_limit(self) -> bool:
@@ -167,7 +167,7 @@ class LLMWrapper:
             "_call_provider must be implemented for specific LLM provider"
         )
 
-    def cache_rehearsed_issues(self, rehearsed_issues: List[dict]) -> None:
+    def cache_rehearsed_issues(self, rehearsed_issues: List[dict[str, str]]) -> None:
         """Pre-cache results for demo/rehearsal issues before live demo.
 
         Args:
