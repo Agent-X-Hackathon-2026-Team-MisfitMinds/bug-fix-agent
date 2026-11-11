@@ -43,6 +43,12 @@ class RunRepo:
         self._runs: dict[UUID, Run] = {}
         self._steps: dict[UUID, list[RunStep]] = {}
 
+    def get_by_id(self, run_id):
+        return self._runs.get(run_id)
+
+    def get_steps_by_id(self, run_id):
+        return list(self._steps.get(run_id, []))
+
     def create(self, *, installation_id: int, repository_full_name: str, issue_number: int,
                issue_title: str, issue_body: str, triggered_by: str) -> Run:
         now = _now()
@@ -65,17 +71,6 @@ class RunRepo:
 
     def get_steps(self, caller: Caller, run_id: UUID) -> list[RunStep]:
         self.get(caller, run_id)
-        return list(self._steps[run_id])
-
-    def get_by_id(self, run_id: UUID) -> Run:
-        """Worker accessor: runs are looked up by id, without an HTTP caller."""
-        run = self._runs.get(run_id)
-        if run is None:
-            raise NotFoundError("Run not found")
-        return run
-
-    def get_steps_by_id(self, run_id: UUID) -> list[RunStep]:
-        self.get_by_id(run_id)
         return list(self._steps[run_id])
 
     def list(self, caller: Caller, *, limit: int = 20, cursor: str | None = None,
@@ -106,17 +101,6 @@ class RunRepo:
 
     def add_step(self, step: RunStep) -> None:
         self._steps.setdefault(step.run_id, []).append(step)
-
-    def update_step(self, step: RunStep) -> RunStep:
-        """Insert or replace a step by id so it can move running -> completed."""
-        steps = self._steps.setdefault(step.run_id, [])
-        updated = step.model_copy(update={"updated_at": _now()})
-        for index, existing in enumerate(steps):
-            if existing.id == updated.id:
-                steps[index] = updated
-                return updated
-        steps.append(updated)
-        return updated
 
     def check_retryable(self, caller: Caller, run_id: UUID) -> Run:
         run = self.get(caller, run_id)
