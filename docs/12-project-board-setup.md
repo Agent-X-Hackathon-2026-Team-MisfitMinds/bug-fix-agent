@@ -58,7 +58,7 @@ Columns: Backlog → Ready → In Progress → Review → QA → Done
 ### Phase 5 · Integrations
 | Ticket | Title | Status | Owner |
 |--------|-------|--------|-------|
-| T-18 | GitHub App + webhook | Backlog | Yash |
+| T-18 | GitHub App + webhook | Done | Yash |
 | T-19 | Vercel deploy + env | Backlog | Yash + Subhi |
 | T-20 | SSE bridge | Backlog | Subhi + Yash |
 
@@ -66,7 +66,7 @@ Columns: Backlog → Ready → In Progress → Review → QA → Done
 | Ticket | Title | Status | Owner |
 |--------|-------|--------|-------|
 | T-21 | Security headers + rate limits | Done | Yash |
-| T-22 | CI pipeline | Backlog | Yash |
+| T-22 | CI pipeline | Done | Yash |
 | T-23 | E2E suite | Backlog | Subhi; you verify |
 | T-24 | Bundle + visual baselines | Backlog | Subhi |
 
