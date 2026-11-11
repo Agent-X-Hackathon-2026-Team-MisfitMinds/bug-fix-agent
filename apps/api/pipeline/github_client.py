@@ -297,6 +297,28 @@ class GitHubClient:
 
 
 _default_client: GitHubClient | None = None
+_shared_auth: GitHubAppAuth | None = None
+
+
+def _installation_auth() -> GitHubAppAuth:
+    """One auth object per process so minted tokens are reused across runs."""
+    global _shared_auth
+    if _shared_auth is None:
+        _shared_auth = auth_from_settings()
+    return _shared_auth
+
+
+def client_for(installation_id: int, repository: str) -> GitHubClient:
+    """Client for the installation and repository that triggered a run.
+
+    `default_client()` is the demo shortcut bound to `.env`; a queued run must
+    write back to the repo it actually came from. `pipeline.runner.handle_run`
+    should build its client from the stored `Run` with this function.
+    """
+    if installation_id <= 0:
+        raise GitHubAPIError("A positive installation id is required")
+    _validate_repo(repository)
+    return GitHubClient(_installation_auth(), installation_id, repository)
 
 
 def default_client() -> GitHubClient:
@@ -315,8 +337,9 @@ def default_client() -> GitHubClient:
 
 
 def reset_default_client() -> None:
-    global _default_client
+    global _default_client, _shared_auth
     _default_client = None
+    _shared_auth = None
 
 
 async def get_issue(issue_id: int) -> dict[str, Any]:
