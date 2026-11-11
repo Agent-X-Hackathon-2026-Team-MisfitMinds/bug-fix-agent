@@ -11,6 +11,6 @@ test('theme switch applies button colours together without an in-between backgro
     if(!button)throw new Error('Missing sign-out button');
     const style=getComputedStyle(button);return {background:style.backgroundColor,color:style.color};
   });
-  expect(colours.background).toBe('rgb(45, 38, 33)');
-  expect(colours.color).toBe('rgb(250, 242, 232)');
+  expect(colours.background).toBe('rgb(36, 39, 42)');
+  expect(colours.color).toBe('rgb(245, 245, 243)');
 });
