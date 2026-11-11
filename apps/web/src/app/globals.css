@@ -74,3 +74,7 @@
 
 /* Switch theme colours together; avoid low-contrast intermediate button colours. */
 .theme-changing *, .theme-changing *::before, .theme-changing *::after{transition:none!important}
+
+/* Keep long backend-provided issue text inside the run-detail viewport. */
+.page-intro h1,.page-intro p,.review-copy,.review-issue strong,.review-issue p,.review-issue>span{overflow-wrap:anywhere}
+.review-view,.review-insights,.review-card,.review-issue{min-width:0}
