@@ -60,6 +60,8 @@ Issue #5 is filed with deliberately thin text; that is why it ends in "couldn't 
 
 ## Recorded backup run
 
+Spoken script, slide outline, judge Q&A and the recording procedure: `docs/20-demo-kit-t33.md`.
+
 If LLM free-tier rate limits interrupt the live demo:
 - [ ] Pre-recorded video of all 3 seeded issues → draft PRs
 - [ ] Video shows red→green proof for issues #1 and #4
