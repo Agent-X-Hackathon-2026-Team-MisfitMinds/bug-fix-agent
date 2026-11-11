@@ -45,8 +45,8 @@ Result is one of: PASS / FAIL / NOT RUN. Evidence is a CI run link or pasted out
 | Check | Result | Evidence |
 |-------|--------|----------|
 | Issue #1 → draft PR with failing-before / passing-after proof | | |
-| Issue #2 → draft PR with failing-before / passing-after proof | | |
-| Issue #3 → "couldn't reproduce" comment, no PR | | |
+| Issue #4 → draft PR with failing-before / passing-after proof | | |
+| Issue #5 → "couldn't reproduce" comment, no PR | | |
 | Dashboard shows all three runs | | |
 | Sandbox isolation active (no network, non-root, no mounts, limits) | | |
 | Agent has no merge permission; PRs are drafts | | |

@@ -22,14 +22,14 @@ human reviews and merges.
 | 2 | 0:30–0:50 | Demo repo, issue #1 open | Our whole interface is one action. I add the label `agent-fix` to this issue. Nothing else. |
 | 3 | 0:50–2:20 | Dashboard run detail, live timeline | The run appears. Six steps: read the issue, reproduce it inside a Docker sandbox, diagnose, fix, verify, open a pull request. Narrate each step as it turns complete. On Reproduce: "it first writes a test that fails. No failing test, no fix." On Verify: "the new test must pass and the existing suite must stay green." |
 | 4 | 2:20–3:20 | The draft PR on GitHub | This is the output: a draft pull request. Failing-before and passing-after test output, the root cause in plain English, what changed, and a confidence level with reasons. It is a draft. The agent has no merge permission. A person decides. |
-| 5 | 3:20–4:00 | Issue #3, then its run | This issue is too vague to reproduce. Label it. The agent does not guess: it comments that it could not reproduce and opens no PR. An honest "no" is a feature. |
+| 5 | 3:20–4:00 | Issue #5, then its run | This issue is too vague to reproduce. Label it. The agent does not guess: it comments that it could not reproduce and opens no PR. An honest "no" is a feature. |
 | 6 | 4:00–4:40 | Slide 6 | Safety. Untrusted code runs only in a throwaway container: no network after dependencies are installed, non-root user, no host mounts, CPU, memory and time limits, and no tokens inside the sandbox. |
 | 7 | 4:40–5:00 | Slide 7 | Scope today: Python and pytest, on our seeded repository. Cost: ₹0, free tiers only, self-hostable for private repos. Other languages are roadmap. |
 
 Block lengths: 30 + 20 + 90 + 60 + 40 + 40 + 20 = 300 seconds.
 
 **Presenter notes**
-- Issue #2 is labelled before going on stage only if the rehearsal showed a single run takes too
+- Issue #4 is labelled before going on stage only if the rehearsal showed a single run takes too
   long to show two live. Say so if it was started earlier.
 - Keep the terminal with the webhook tunnel off the projected screen (guide §9: no secrets in
   screenshots).
@@ -97,8 +97,8 @@ before; a recording of a partial or simulated run is not a backup.
 **The recording must show** (same items as the "Recorded backup run" checklist in `docs/18`):
 1. Label added to issue #1; run appears; all six steps complete.
 2. Draft PR for issue #1 with failing-before / passing-after output and root cause.
-3. Same for issue #2.
-4. Issue #3 ending in the "couldn't reproduce" comment, with no PR.
+3. Same for issue #4.
+4. Issue #5 ending in the "couldn't reproduce" comment, with no PR.
 5. Dashboard listing all three runs.
 
 **Before recording**
@@ -131,6 +131,6 @@ it on the presenting laptop and one second device. Record where it is here after
 
 Fill in after each rehearsal. One row per attempt, including failed ones.
 
-| Date | Issue #1 | Issue #2 | Issue #3 | Dashboard shows 3 runs | Notes |
+| Date | Issue #1 | Issue #4 | Issue #5 | Dashboard shows 3 runs | Notes |
 |------|----------|----------|----------|------------------------|-------|
 | | | | | | |
