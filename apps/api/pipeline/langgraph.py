@@ -121,13 +121,14 @@ async def reproduce_node(
     If test passes -> status = could_not_reproduce.
     """
 
-    # Clone repo via Yash's sandbox and run baseline tests
+    # Clone repo via sandbox and run baseline tests
     try:
-        sandbox_result = await yash_sandbox.clone_and_test(
-            repo_name=state.repo_name,
-            issue_id=state.issue_id,
-            timeout=300,  # 5 minute timeout max
-            network_disabled_after_install=True,
+        from pipeline.sandbox import SandboxConfig, clone_and_test_async, repository_url
+
+        result, passed = await clone_and_test_async(
+            repository_url(state.repo_name),
+            SandboxConfig(timeout_seconds=300),
+            f"bfa-{state.issue_id}-repro",
         )
     except Exception as e:
         state.errors.append(f"Sandbox error during reproduce: {e}")
@@ -135,15 +136,19 @@ async def reproduce_node(
         return state
 
     # Capture baseline test results
-    state.before_test_output = sandbox_result.get("test_output")
-    state.before_exit_code = sandbox_result.get("exit_code", 0)
+    state.before_test_output = result.stdout
+    state.before_exit_code = result.exit_code
+    if result.environment_error or result.timed_out:
+        state.errors.append("Sandbox environment error or timeout")
+        state.status = RunStatus.failed
+        return state
 
     # Write minimal reproduction test based on issue
     try:
         reproduction_test = await write_reproduction_test(
             issue={"title": state.issue_title or "", "body": state.issue_body or ""},
-            repo_snapshot=sandbox_result.get("repo_snapshot") or {},
-            failing_test=sandbox_result.get("failing_test"),
+            repo_snapshot={},
+            failing_test=None,
         )
         state.reproduction_test_code = reproduction_test
     except Exception as e:
