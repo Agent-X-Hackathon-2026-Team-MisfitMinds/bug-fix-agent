@@ -63,7 +63,7 @@ test('run detail recovers from an error and does not invent evidence or a PR',as
   let fail=true;await page.route('**/api/runs/test-run-1',route=>fail?route.fulfill({status:500,body:'internal details'}):route.fulfill({json:run}));
   await page.goto('/dashboard/runs/test-run-1');await expect(page.getByRole('heading',{name:'Couldn’t load this run. Try again.'})).toBeVisible();
   fail=false;await page.getByRole('button',{name:'Try again'}).click();await expect(page.getByRole('heading',{name:run.issue_title})).toBeVisible();
-  await expect(page.getByText('No test output available')).toBeVisible();await expect(page.getByText('No pull request link has been reported.')).toBeVisible();
+  await expect(page.getByText('No test output available')).toBeVisible();await expect(page.getByText('No usable pull request link has been reported.')).toBeVisible();
   await expect(page.getByRole('link',{name:/Review draft PR/})).toHaveCount(0);
   await expect(page.locator('.actions').getByText('Completed',{exact:true})).toBeVisible();
 });

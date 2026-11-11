@@ -4,9 +4,9 @@ import {sampleRuns} from '../src/lib/sample-data';
 
 afterEach(()=>vi.unstubAllGlobals());
 describe('GitHub links',()=>{
-  it('allows only HTTPS links to github.com',()=>{
+  it('accepts only HTTPS GitHub pull request URL formats',()=>{
     expect(safeGithubUrl('https://github.com/owner/repo/pull/1')).toBe('https://github.com/owner/repo/pull/1');
-    for(const value of [null,'http://github.com/owner/repo','https://github.com.evil.example/x','javascript:alert(1)','not-a-url']) expect(safeGithubUrl(value)).toBeNull();
+    for(const value of [null,'http://github.com/owner/repo','https://github.com.evil.example/x','javascript:alert(1)','not-a-url','https://github.com/owner/repo','https://github.com/owner/repo/issues/1','https://github.com/owner/repo/pull/0','https://github.com/owner/repo/pull/not-a-number','https://user:secret@github.com/owner/repo/pull/1','https://github.com:8443/owner/repo/pull/1']) expect(safeGithubUrl(value)).toBeNull();
   });
 });
 describe('API client',()=>{
