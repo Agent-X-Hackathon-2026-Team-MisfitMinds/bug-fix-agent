@@ -588,3 +588,12 @@ async def clone_and_test_async(
         container_name,
         install_first=install_first,
     )
+
+
+async def prepare_workspace_async(repo_url: str, *, timeout: int = 120) -> Path:
+    """`prepare_workspace` without blocking the API event loop.
+
+    Unlike `clone_and_test_async` the workspace is kept: the pipeline patches
+    files in it between test runs and deletes it when the run finishes.
+    """
+    return await asyncio.to_thread(prepare_workspace, repo_url, timeout=timeout)
