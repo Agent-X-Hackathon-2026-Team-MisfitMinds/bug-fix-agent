@@ -459,14 +459,23 @@ async def verify_node(
 
     # 2. Run full existing pytest suite - must stay GREEN
     try:
-        full_suite = await pytest_runner.run_suite(
-            test_directory="apps/api/tests/",
+        from pipeline.sandbox import run_workspace_tests_async
+
+        full_suite = await run_workspace_tests_async(
+            test_paths=["apps/api/tests/"],
             timeout=300,
         )
     except Exception as e:
-        state.errors.append(f"Failed to run full pytest suite: {e}")
-        state.status = RunStatus.failed
-        return state
+        # Fallback to host runner if sandbox helper unavailable
+        try:
+            full_suite = await pytest_runner.run_suite(
+                test_directory="apps/api/tests/",
+                timeout=300,
+            )
+        except Exception as e2:
+            state.errors.append(f"Failed to run full pytest suite: {e2}")
+            state.status = RunStatus.failed
+            return state
 
     # Critical: full suite must remain green
     if not full_suite.passed:
