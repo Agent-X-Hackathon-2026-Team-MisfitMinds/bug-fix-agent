@@ -96,6 +96,12 @@ docker build -f apps/api/docker/sandbox.Dockerfile -t bug-fix-agent-sandbox:late
 The container runs as a non-root user with no network, a read-only root filesystem,
 memory/CPU caps and a hard timeout.
 
+`pipeline.sandbox.clone_and_test()` prepares a repository for that runner: it
+shallow-clones one branch on the host (the token travels in a git env-var
+config, never in argv), bakes the checkout and any root `requirements.txt` into
+a throwaway image, runs the tests in that image, then deletes it. Clone and
+build failures come back as environment errors, not test failures.
+
 ## Tests
 
 ```bash
