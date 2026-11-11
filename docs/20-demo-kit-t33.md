@@ -107,8 +107,10 @@ before; a recording of a partial or simulated run is not a backup.
 - Use the same demo repo and issue text as the live demo (`docs/19`).
 - One continuous take per issue; do not splice a failing run into a passing one.
 
-**Storage:** keep the file outside the repository (it is large and may show account details). Have
-it on the presenting laptop and one second device. Record where it is here after it exists:
+**Storage:** keep the file outside the repository (it is large and may show account details).
+Recommended: the presenting laptop, a USB drive, and one private cloud folder (Google Drive or
+Dropbox, shared with the team only, not a public link). Record the exact locations here after it
+exists:
 
 | Item | Value |
 |------|-------|
@@ -131,6 +133,6 @@ it on the presenting laptop and one second device. Record where it is here after
 
 Fill in after each rehearsal. One row per attempt, including failed ones.
 
-| Date | Issue #1 | Issue #4 | Issue #5 | Dashboard shows 3 runs | Notes |
-|------|----------|----------|----------|------------------------|-------|
-| | | | | | |
+| Date | Issue #1 | Issue #4 | Issue #5 | Dashboard shows 3 runs | Script followed? | Notes |
+|------|----------|----------|----------|------------------------|------------------|-------|
+| | | | | | | |
