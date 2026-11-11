@@ -7,6 +7,7 @@ from pathlib import Path
 
 from pipeline.sandbox import (
     SandboxConfig,
+    SandboxResult,
     container_name,
     run_workspace_tests_async,
 )
@@ -17,6 +18,8 @@ class PytestResult:
     passed: bool
     output: str
     exit_code: int
+    timed_out: bool = False
+    environment_error: bool = False
 
 
 class PytestRunner:
@@ -38,8 +41,33 @@ class PytestRunner:
     def _container(self) -> str:
         return container_name(self.issue_id)
 
+    @staticmethod
+    def _result(result: SandboxResult) -> PytestResult:
+        output = result.stdout.strip()
+        if result.stderr.strip():
+            output = f"{output}\n{result.stderr.strip()}".strip()
+        return PytestResult(
+            passed=result.ok,
+            output=output or result.message(),
+            exit_code=result.exit_code,
+            timed_out=result.timed_out,
+            environment_error=result.environment_error,
+        )
+
     def _no_workspace(self) -> PytestResult:
-        return PytestResult(passed=False, output="no workspace configured", exit_code=1)
+        return PytestResult(
+            passed=False,
+            output="no workspace configured",
+            exit_code=1,
+            environment_error=True,
+        )
+
+    @staticmethod
+    def _test_path(test_file: str) -> str:
+        path = test_file.replace("\\", "/")
+        if path.startswith("/") or any(part == ".." for part in path.split("/")):
+            raise ValueError("test_file must be a workspace-relative path")
+        return path
 
     async def run(self, test_file: str, timeout: int | None = None) -> PytestResult:
         """Run a single test file inside the sandbox workspace."""
@@ -49,13 +77,9 @@ class PytestRunner:
             self.workspace,
             self._config(timeout),
             self._container(),
-            test_paths=[test_file],
+            test_paths=[self._test_path(test_file)],
         )
-        return PytestResult(
-            passed=result.ok,
-            output=result.stdout,
-            exit_code=result.exit_code,
-        )
+        return self._result(result)
 
     async def run_suite(self, timeout: int | None = None) -> PytestResult:
         """Run the full test suite inside the sandbox workspace."""
@@ -66,8 +90,4 @@ class PytestRunner:
             self._config(timeout),
             self._container(),
         )
-        return PytestResult(
-            passed=result.ok,
-            output=result.stdout,
-            exit_code=result.exit_code,
-        )
+        return self._result(result)
