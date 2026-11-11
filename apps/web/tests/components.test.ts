@@ -16,7 +16,7 @@ describe('Skeleton',()=>{
   it('announces loading and hides decorative placeholders',()=>{const html=renderToStaticMarkup(h(Skeleton,{label:'Loading runs…'}));expect(html).toContain('role="status"');expect(html).toContain('Loading runs…');expect(html).toContain('aria-hidden="true"')});
 });
 describe('EmptyState',()=>{
-  it('shows the title, explanation and action',()=>{const html=renderToStaticMarkup(h(EmptyState,{title:'No runs yet.',action:h('a',{href:'/how-it-works'},'Learn more')},'Add the label.'));expect(html).toContain('No runs yet.');expect(html).toContain('Add the label.');expect(html).toContain('href="/how-it-works"')});
+  it('shows the title, explanation and action',()=>{const html=renderToStaticMarkup(h(EmptyState,{title:'No runs yet.',action:h('a',{href:'/workspace'},'Learn more')},'Add the label.'));expect(html).toContain('No runs yet.');expect(html).toContain('Add the label.');expect(html).toContain('href="/workspace"')});
   it('escapes untrusted text',()=>{const html=renderToStaticMarkup(h(EmptyState,{title:'<script>alert(1)</script>'},'Text'));expect(html).not.toContain('<script>');expect(html).toContain('&lt;script&gt;')});
 });
 describe('Toast',()=>{

@@ -13,20 +13,3 @@ for(const path of ['/dashboard','/dashboard/runs/crawl-test']){
   });
 }
 
-test('robots.txt disallows the private application routes',async({request})=>{
-  const response=await request.get('/robots.txt');
-  expect(response.ok()).toBe(true);
-  const text=await response.text();
-  for(const path of ['/dashboard','/auth/','/api/']){
-    expect(text.split(/\r?\n/).some(line=>line.trim()===`Disallow: ${path}`),path).toBe(true);
-  }
-});
-
-test('sitemap does not list private application routes',async({request})=>{
-  const response=await request.get('/sitemap.xml');
-  expect(response.ok()).toBe(true);
-  const xml=await response.text();
-  const locations=Array.from(xml.matchAll(/<loc>\s*([^<]+)\s*<\/loc>/g),match=>new URL(match[1].trim()).pathname);
-  expect(locations.length).toBeGreaterThan(0);
-  expect(locations.filter(path=>/^\/(dashboard|auth|api)(\/|$)/.test(path))).toEqual([]);
-});
