@@ -51,6 +51,14 @@ class Settings(BaseSettings):
     )
     gemini_api_key: str = Field(default="", validation_alias=AliasChoices("GEMINI_API_KEY"))
     gemini_model: str = Field(default="gemini-2.0-flash", validation_alias=AliasChoices("GEMINI_MODEL"))
+    gemini_api_key: SecretStr = Field(
+        default=SecretStr(""),
+        validation_alias=AliasChoices("GEMINI_API_KEY", "LLM_API_KEY"),
+    )
+    gemini_model: str = Field(
+        default="gemini-3.8-flash",
+        validation_alias=AliasChoices("GEMINI_MODEL"),
+    )
     cookie_secure: bool = True
     session_ttl_seconds: int = 86400
     oauth_state_ttl_seconds: int = 600
