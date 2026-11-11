@@ -141,41 +141,6 @@ class SSEEvent(BaseModel):
 # ------------------------------------------------------------
 
 
-class RunStatus(str, Enum):
-    """Current run status - must match TS RunStatus.
-
-    Required values: pending, reproducing, fixing, verifying,
-    completed, failed, could_not_reproduce
-    """
-    pending = "pending"
-    reproducing = "reproducing"
-    fixing = "fixing"
-    verifying = "verifying"
-    completed = "completed"
-    failed = "failed"
-    could_not_reproduce = "could_not_reproduce"
-
-
-class ConfidenceLevel(str, Enum):
-    """Confidence level in the result - must match TS ConfidenceLevel."""
-    high = "high"
-    medium = "medium"
-    low = "low"
-
-
-class PipelineStep(str, Enum):
-    """Current pipeline step - must match TS PipelineStep.
-
-    Required values: read, reproduce, diagnose, fix, verify, pr
-    """
-    read = "read"
-    reproduce = "reproduce"
-    diagnose = "diagnose"
-    fix = "fix"
-    verify = "verify"
-    pr = "pr"
-
-
 class RunState(BaseModel):
     """Typed graph state shared across all pipeline nodes.
 
