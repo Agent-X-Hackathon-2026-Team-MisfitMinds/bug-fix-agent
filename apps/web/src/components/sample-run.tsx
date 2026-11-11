@@ -1,0 +1,6 @@
+'use client';
+import {useState} from 'react';
+import Link from 'next/link';
+import {RunView} from '@/components/run-view';
+import {sampleRuns} from '@/lib/sample-data';
+export function SampleRun({initial}:{initial:number}){const [selected,setSelected]=useState(Math.min(2,Math.max(0,initial)));const run=sampleRuns[selected];return <div className="wrap page"><Link className="text-link" href="/demo">← Back to demo</Link><div className="demo-header"><div><span className="eyebrow"><span className="dot"/> INTERACTIVE EXAMPLE</span><h1>{run.issue_title}</h1><p className="muted">{run.repository_full_name} · Issue #{run.issue_number}</p></div><span className="sample">Illustrative, not live</span></div><div className="notice" role="note"><strong>Example only.</strong> This is simulated content to show the intended user flow—not a real run, test result or pull request.</div><div className="sample-picker" aria-label="Choose an example issue"><span className="muted">Example issue</span>{sampleRuns.map((item,i)=><button type="button" key={item.id} className={`sample-choice ${selected===i?'selected':''}`} aria-pressed={selected===i} onClick={()=>setSelected(i)}>{i+1}. {i===0?'Discount':i===1?'Age boundary':'Couldn’t reproduce'}</button>)}</div><RunView run={run} illustrative/></div>}
