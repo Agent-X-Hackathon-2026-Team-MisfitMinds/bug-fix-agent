@@ -25,6 +25,7 @@ from uuid import UUID
 logger = logging.getLogger(__name__)
 
 RunHandler = Callable[[UUID], Awaitable[None]]
+ErrorHandler = Callable[[UUID, BaseException], Awaitable[None] | None]
 HANDLER_MODULE = "pipeline.runner"
 HANDLER_NAME = "handle_run"
 
@@ -44,9 +45,16 @@ def load_handler() -> RunHandler | None:
 class PipelineQueue:
     """Bounded, in-process asyncio queue for pipeline runs."""
 
-    def __init__(self, handler: RunHandler | None = None, *, concurrency: int = 2) -> None:
+    def __init__(
+        self,
+        handler: RunHandler | None = None,
+        *,
+        concurrency: int = 2,
+        on_error: ErrorHandler | None = None,
+    ) -> None:
         self._handler = handler
         self._concurrency = max(1, concurrency)
+        self._on_error = on_error
         self._tasks: set[asyncio.Task[None]] = set()
         self._semaphore: asyncio.Semaphore | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
@@ -57,6 +65,9 @@ class PipelineQueue:
 
     def set_handler(self, handler: RunHandler | None) -> None:
         self._handler = handler
+
+    def set_error_handler(self, on_error: ErrorHandler | None) -> None:
+        self._on_error = on_error
 
     def enqueue(self, run_id: UUID) -> bool:
         """Schedule `run_id`; returns False when no handler is registered.
@@ -93,8 +104,20 @@ class PipelineQueue:
                 await handler(run_id)
             except asyncio.CancelledError:
                 raise
-            except Exception:
+            except Exception as exc:
                 logger.exception("pipeline handler failed for run %s", run_id)
+                await self._report_failure(run_id, exc)
+
+    async def _report_failure(self, run_id: UUID, exc: BaseException) -> None:
+        """Tell the owner of the queue that a run failed, without re-raising."""
+        if self._on_error is None:
+            return
+        try:
+            result = self._on_error(run_id, exc)
+            if asyncio.iscoroutine(result):
+                await result
+        except Exception:
+            logger.exception("pipeline error handler failed for run %s", run_id)
 
     async def wait(self) -> None:
         """Wait until every scheduled run has finished (tests, shutdown)."""

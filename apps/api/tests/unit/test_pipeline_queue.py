@@ -50,6 +50,85 @@ def test_handler_failure_is_logged_and_does_not_propagate(
     assert "pipeline handler failed" in caplog.text
 
 
+def test_handler_failure_invokes_the_error_handler() -> None:
+    seen: list[tuple[UUID, str]] = []
+
+    async def handler(run_id: UUID) -> None:
+        raise RuntimeError("boom")
+
+    async def on_error(run_id: UUID, exc: BaseException) -> None:
+        seen.append((run_id, type(exc).__name__))
+
+    async def scenario() -> UUID:
+        queue = PipelineQueue(handler, on_error=on_error)
+        run_id = uuid4()
+        assert queue.enqueue(run_id)
+        await queue.wait()
+        return run_id
+
+    run_id = asyncio.run(scenario())
+
+    assert seen == [(run_id, "RuntimeError")]
+
+
+def test_sync_error_handler_is_supported() -> None:
+    seen: list[str] = []
+
+    async def handler(run_id: UUID) -> None:
+        raise ValueError("bad state")
+
+    def on_error(run_id: UUID, exc: BaseException) -> None:
+        seen.append(str(exc))
+
+    async def scenario() -> None:
+        queue = PipelineQueue(handler, on_error=on_error)
+        queue.enqueue(uuid4())
+        await queue.wait()
+
+    asyncio.run(scenario())
+
+    assert seen == ["bad state"]
+
+
+def test_a_failing_error_handler_does_not_escape(caplog: pytest.LogCaptureFixture) -> None:
+    async def handler(run_id: UUID) -> None:
+        raise RuntimeError("boom")
+
+    def on_error(run_id: UUID, exc: BaseException) -> None:
+        raise RuntimeError("error handler is broken too")
+
+    async def scenario() -> None:
+        queue = PipelineQueue(handler, on_error=on_error)
+        queue.enqueue(uuid4())
+        await queue.wait()
+
+    with caplog.at_level("ERROR"):
+        asyncio.run(scenario())
+
+    assert "pipeline error handler failed" in caplog.text
+
+
+def test_cancellation_is_not_reported_as_a_run_failure() -> None:
+    seen: list[UUID] = []
+
+    async def handler(run_id: UUID) -> None:
+        await asyncio.sleep(60)
+
+    def on_error(run_id: UUID, exc: BaseException) -> None:
+        seen.append(run_id)
+
+    async def scenario() -> None:
+        queue = PipelineQueue(handler, on_error=on_error)
+        queue.enqueue(uuid4())
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        await queue.shutdown()
+
+    asyncio.run(scenario())
+
+    assert seen == []
+
+
 def test_shutdown_cancels_in_flight_runs() -> None:
     cancelled: list[bool] = []
 

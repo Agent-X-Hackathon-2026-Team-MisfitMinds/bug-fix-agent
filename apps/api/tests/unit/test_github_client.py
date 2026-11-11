@@ -6,7 +6,7 @@ import httpx
 import pytest
 
 from github_app import GitHubAppAuth
-from pipeline.github_client import GitHubAPIError, GitHubClient
+from pipeline.github_client import GitHubAPIError, GitHubClient, client_for
 
 
 class StaticAuth(GitHubAppAuth):
@@ -46,6 +46,27 @@ def _client(recorder: Recorder, auth: StaticAuth | None = None) -> GitHubClient:
         transport=httpx.MockTransport(recorder),
         timeout=5.0,
     )
+
+
+def test_client_for_binds_the_run_installation_and_repository(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("pipeline.github_client._installation_auth", StaticAuth)
+
+    client = client_for(7, "fixie-demo/seeded-repo")
+
+    assert client.installation_id == 7
+    assert client.repository == "fixie-demo/seeded-repo"
+
+
+def test_client_for_rejects_a_non_positive_installation() -> None:
+    with pytest.raises(GitHubAPIError):
+        client_for(0, "octo/repo")
+
+
+def test_client_for_rejects_a_malformed_repository() -> None:
+    with pytest.raises(GitHubAPIError):
+        client_for(7, "../../etc/passwd")
 
 
 def _body(request: httpx.Request) -> dict[str, Any]:

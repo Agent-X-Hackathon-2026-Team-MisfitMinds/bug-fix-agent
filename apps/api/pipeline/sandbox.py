@@ -28,6 +28,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
+from uuid import uuid4
 
 SANDBOX_IMAGE = "bug-fix-agent-sandbox:latest"
 SANDBOX_USER = "nonroot"
@@ -237,6 +238,16 @@ def repository_url(repository: str) -> str:
     return f"https://github.com/{repository}.git"
 
 
+def container_name(issue_id: int | str, *, suffix: str | None = None) -> str:
+    """Unique, Docker-valid container name for one pipeline run.
+
+    Retries and concurrent runs must not reuse a name: a leftover container
+    would make the next ``docker run`` fail with a name conflict.
+    """
+    sanitized = re.sub(r"[^A-Za-z0-9_.-]", "-", str(issue_id))[:40]
+    return f"bfa-{sanitized}-{(suffix or uuid4().hex)[:8]}"[:63]
+
+
 def _validate_repo_url(repo_url: str) -> str:
     if repo_url.startswith("-") or any(character.isspace() for character in repo_url):
         raise ValueError("repo_url must be a plain https URL")
@@ -299,9 +310,18 @@ def prepare_workspace(
 
 
 def _requirements_file(workspace: Path) -> Path | None:
+    """Return ``requirements.txt`` only when it pins at least one package.
+
+    The seeded demo repo ships a comments-only file; installing from it needs a
+    network round-trip for nothing, so treat it as "no dependencies".
+    """
     candidate = workspace / "requirements.txt"
-    if candidate.is_file() and candidate.stat().st_size > 0:
-        return candidate
+    if not candidate.is_file():
+        return None
+    for line in candidate.read_text(encoding="utf-8", errors="replace").splitlines():
+        stripped = line.split("#", 1)[0].strip()
+        if stripped:
+            return candidate
     return None
 
 

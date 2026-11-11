@@ -1,4 +1,5 @@
 import io
+import re
 import subprocess
 import tarfile
 from collections.abc import Callable
@@ -13,12 +14,14 @@ from pipeline.sandbox import (
     SandboxConfig,
     SandboxError,
     clone_and_test,
+    container_name,
     prepare_workspace,
     repository_url,
     run_workspace_tests,
 )
 
 CONFIG = SandboxConfig(timeout_seconds=30)
+ISSUE_IDS: list[int | str] = [1, 42, "issue-42", "../../etc", "x" * 80]
 
 
 class Recorder:
@@ -73,6 +76,27 @@ def test_repository_url_builds_anonymous_https_clone_url() -> None:
 def test_repository_url_rejects_malformed_names(repository: str) -> None:
     with pytest.raises(ValueError):
         repository_url(repository)
+
+
+def test_container_name_is_unique_per_run() -> None:
+    first = container_name(7)
+    second = container_name(7)
+
+    assert first != second
+    assert first.startswith("bfa-7-")
+
+
+def test_container_name_is_accepted_by_docker_validation() -> None:
+    for issue_id in ISSUE_IDS:
+        name = container_name(issue_id)
+        assert re.fullmatch(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$", name), name
+
+
+def test_container_name_sanitizes_hostile_input() -> None:
+    name = container_name("../../etc/passwd", suffix="abc123")
+
+    assert "/" not in name
+    assert name == "bfa-..-..-etc-passwd-abc123"
 
 
 @pytest.mark.parametrize(
@@ -230,6 +254,20 @@ def test_workspace_without_requirements_runs_offline(tmp_path: Path) -> None:
     assert not any("pip" in command for command in recorder.commands)
     assert not any("disconnect" in command for command in recorder.commands)
     assert len(recorder.exec_commands()) == 2
+
+
+def test_a_comments_only_requirements_file_runs_offline(tmp_path: Path) -> None:
+    root = make_workspace(tmp_path, requirements=False)
+    (root / "requirements.txt").write_text(
+        "# Seeded demo repo - standard library only.\n\n", encoding="utf-8"
+    )
+    recorder = Recorder()
+
+    result = run_workspace_tests(root, CONFIG, "sandbox-abc", runner=recorder)
+
+    assert result.ok
+    assert not any("pip" in command for command in recorder.commands)
+    assert not any("network" in command for command in recorder.commands)
 
 
 def test_dependency_install_failure_is_an_environment_error(tmp_path: Path) -> None:
