@@ -7,171 +7,9 @@ Each node is small, testable, and follows the execution guide rules.
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Awaitable, Callable
-from datetime import datetime as _DateTime
-from datetime import timedelta
-from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Optional, List, Dict
 
-from pydantic import BaseModel, Field
-
-
-# ------------------------------------------------------------
-# Run State Contract - must match TS types in packages/shared/
-# ------------------------------------------------------------
-
-
-class RunStatus(str, Enum):
-    """Current run status - must match TS RunStatus."""
-    pending = "pending"
-    reproducing = "reproducing"
-    fixing = "fixing"
-    verifying = "verifying"
-    completed = "completed"
-    failed = "failed"
-    could_not_reproduce = "could_not_reproduce"
-
-
-class ConfidenceLevel(str, Enum):
-    """Confidence level in the result."""
-    high = "high"
-    medium = "medium"
-    low = "low"
-
-
-class PipelineStep(str, Enum):
-    """Current pipeline step - must match TS PipelineStep."""
-    read = "read"
-    reproduce = "reproduce"
-    diagnose = "diagnose"
-    fix = "fix"
-    verify = "verify"
-    pr = "pr"
-
-
-# ------------------------------------------------------------
-# Shared Run State Model
-# ------------------------------------------------------------
-
-
-class RunState(BaseModel):
-    """Typed graph state shared across all pipeline nodes.
-
-    Fields kept in sync with packages/shared/types.ts
-    """
-
-    # Identification
-    run_id: str = Field(default_factory=lambda: f"run-{hashlib.sha256(str(__import__('uuid').uuid4()).encode()).hexdigest()[:12]}")
-    issue_id: int = Field(..., description="GitHub issue number")
-    repo_name: str = Field(..., description="Repository in owner/name format")
-    branch: str = Field(default="agent-fix", description="Working branch name")
-
-    # Status & Step Tracking
-    status: RunStatus = Field(default=RunStatus.pending, description="Current run status")
-    step: PipelineStep = Field(default=PipelineStep.read, description="Current pipeline step")
-    confidence: Optional[ConfidenceLevel] = Field(
-        default=None,
-        description="Confidence in current result: high/medium/low",
-    )
-
-    # Issue Details
-    issue_title: Optional[str] = Field(default=None, description="Issue title from GitHub")
-    issue_body: Optional[str] = Field(default=None, description="Issue body/description")
-    reproduction_steps: Optional[str] = Field(
-        default=None,
-        description="Extracted reproduction steps from issue",
-    )
-
-    # Before Fix Evidence
-    before_test_output: Optional[str] = Field(
-        default=None,
-        description="Test output before the fix was applied",
-    )
-    before_exit_code: Optional[int] = Field(
-        default=None,
-        description="Exit code before the fix",
-    )
-
-    # After Fix Evidence
-    after_test_output: Optional[str] = Field(
-        default=None,
-        description="Test output after the fix was applied",
-    )
-    after_exit_code: Optional[int] = Field(
-        default=None,
-        description="Exit code after the fix",
-    )
-
-    # Root Cause & Patch
-    root_cause: Optional[str] = Field(
-        default=None,
-        description="Plain-English root cause diagnosis",
-    )
-    patch: Optional[Dict[str, str]] = Field(
-        default=None,
-        description="Applied patch: {file_path, old_code, new_code, description}",
-    )
-    likely_file: Optional[str] = Field(
-        default=None,
-        description="Likely file containing the bug",
-    )
-    likely_line: Optional[int] = Field(
-        default=None,
-        description="Likely line number containing the bug",
-    )
-
-    # Evidence & Errors
-    evidence: List[str] = Field(
-        default_factory=list,
-        description="Supporting evidence for root cause",
-    )
-    errors: List[str] = Field(
-        default_factory=list,
-        description="Error messages encountered during run",
-    )
-
-    # PR & Branch Information
-    pr_url: Optional[str] = Field(default=None, description="Draft PR URL if opened")
-    branch_name: Optional[str] = Field(
-        default=None,
-        description="Git branch name where patch was applied",
-    )
-
-    # Metadata
-    retry_count: int = Field(
-        default=0,
-        description="Number of retry attempts for this run",
-    )
-    created_at: str = Field(
-        default_factory=lambda: __import__('datetime').datetime.utcnow().isoformat() + "Z",
-        description="ISO timestamp when run was created",
-    )
-    updated_at: str = Field(
-        default_factory=lambda: __import__('datetime').utcnow().isoformat() + "Z",
-        description="ISO timestamp when run was last updated",
-    )
-
-    # Pipeline-only working fields. These are not part of the API contract in
-    # packages/shared/types.ts; they carry intermediate evidence between nodes.
-    comment: Optional[str] = Field(
-        default=None,
-        description="Message to post when the issue lacks reproduction detail",
-    )
-    before_output: Optional[str] = Field(
-        default=None,
-        description="Failing reproduction-test output captured before the fix",
-    )
-    reproduction_test_code: Optional[str] = Field(
-        default=None,
-        description="Generated reproduction test source",
-    )
-    confidence_reasons: Optional[str] = Field(
-        default=None,
-        description="Plain-English reasons behind the confidence level",
-    )
-
-
-NodeFunc = Callable[[RunState], Awaitable[RunState]]
+from schemas import RunStatus, ConfidenceLevel, PipelineStep, RunState
 
 
 # ------------------------------------------------------------
@@ -179,7 +17,7 @@ NodeFunc = Callable[[RunState], Awaitable[RunState]]
 # ------------------------------------------------------------
 
 
-async def read_node(state: RunState, github_client: Any) -> RunState:
+async def read_node(state: RunState, github_client) -> RunState:
     """Node 1: Read - Fetch issue title, body, repository and reproduction steps.
 
     MUST NOT continue if issue has enough expected/actual behaviour info.
@@ -234,7 +72,7 @@ async def read_node(state: RunState, github_client: Any) -> RunState:
         # Continue anyway - user may have confirmed it's Python
 
     # Mark as read step completed
-    state.step = PipelineStep.read
+    state.step = PipelineStep.reproduce
     state.status = RunStatus.pending
 
     return state
@@ -275,7 +113,7 @@ def extract_reproduction_steps(body: str) -> Optional[str]:
 
 
 async def reproduce_node(
-    state: RunState, yash_sandbox: Any, pytest_runner: Any
+    state: RunState, yash_sandbox, pytest_runner
 ) -> RunState:
     """Node 2: Reproduce - Clone repo in Docker, run baseline tests.
 
@@ -283,13 +121,14 @@ async def reproduce_node(
     If test passes -> status = could_not_reproduce.
     """
 
-    # Clone repo via Yash's sandbox and run baseline tests
+    # Clone repo via sandbox and run baseline tests
     try:
-        sandbox_result = await yash_sandbox.clone_and_test(
-            repo_name=state.repo_name,
-            issue_id=state.issue_id,
-            timeout=300,  # 5 minute timeout max
-            network_disabled_after_install=True,
+        from pipeline.sandbox import SandboxConfig, clone_and_test_async, repository_url
+
+        result, passed = await clone_and_test_async(
+            repository_url(state.repo_name),
+            SandboxConfig(timeout_seconds=300),
+            f"bfa-{state.issue_id}-repro",
         )
     except Exception as e:
         state.errors.append(f"Sandbox error during reproduce: {e}")
@@ -297,15 +136,19 @@ async def reproduce_node(
         return state
 
     # Capture baseline test results
-    state.before_test_output = sandbox_result.get("test_output")
-    state.before_exit_code = sandbox_result.get("exit_code", 0)
+    state.before_test_output = result.stdout
+    state.before_exit_code = result.exit_code
+    if result.environment_error or result.timed_out:
+        state.errors.append("Sandbox environment error or timeout")
+        state.status = RunStatus.failed
+        return state
 
     # Write minimal reproduction test based on issue
     try:
         reproduction_test = await write_reproduction_test(
             issue={"title": state.issue_title or "", "body": state.issue_body or ""},
-            repo_snapshot=sandbox_result.get("repo_snapshot"),
-            failing_test=sandbox_result.get("failing_test"),
+            repo_snapshot={},
+            failing_test=None,
         )
         state.reproduction_test_code = reproduction_test
     except Exception as e:
@@ -335,16 +178,14 @@ async def reproduce_node(
 
     # Store failing output for later comparison
     state.before_output = test_result.output
-    state.step = PipelineStep.reproduce
+    state.step = PipelineStep.diagnose
     state.status = RunStatus.reproducing
 
     return state
 
 
 async def write_reproduction_test(
-    issue: dict[str, Any],
-    repo_snapshot: dict[str, Any],
-    failing_test: Optional[dict[str, Any]] = None,
+    issue: dict, repo_snapshot: dict, failing_test: Optional[dict] = None
 ) -> str:
     """Write a minimal reproduction test based on issue and repo state.
 
@@ -352,49 +193,38 @@ async def write_reproduction_test(
     """
     from pathlib import Path
 
-    # Get issue title for test context
+    # Get issue title and body for test context
     title = issue.get("title", "")
+    body = issue.get("body", "")
 
-    # Determine test content
+    # Determine the likely file and function from issue or repo
+    # Heuristic: look for function names, module paths in issue body
+    import re
+
+    # Common patterns for off-by-one, wrong condition, missing null check
+    func_pattern = r"\b(\w+)\s*\([^)]*\)\s*(?:->|\s)"
+    func_matches = re.findall(func_pattern, body + title)
+
+    # Determine test content dynamically from issue + repo snapshot
     if failing_test:
-        # Use provided failing test as base
         test_content = failing_test.get("test_code", "")
     else:
-        # Generate minimal test based on common bug patterns
-        if "calculate_discount" in title.lower():
-            test_content = """def test_calculate_discount_off_by_one():
-    \"\"\"Test for off-by-one error in calculate_discount.\"\"\"
-    from calculate_discount import calculate_discount  # type: ignore
-    
-    # Off-by-one: price should be discounted by 10%, not 90%
-    result = calculate_discount(100, 10)
-    assert result == 90, f"Expected 90, got {result}"
-"""
-        elif "validate_age" in title.lower():
-            test_content = """def test_validate_age_wrong_condition():
-    \"\"\"Test for wrong boundary condition in validate_age.\"\"\"
-    from validate_age import validate_age  # type: ignore
-    
-    # Wrong boundary: age 18 should be valid, not rejected
-    result = validate_age(18)
-    assert result == True, f"Expected True for age 18, got {result}"
-"""
-        elif "get_user_profile" in title.lower():
-            test_content = """def test_get_user_profile_null_check():
-    \"\"\"Test for missing null check in get_user_profile.\"\"\"
-    from get_user_profile import get_user_profile  # type: ignore
-    
-    # Missing null check: should handle None user_id
-    result = get_user_profile(None)
-    assert result is None, f"Expected None for None user_id, got {result}"
-"""
-        else:
-            # Generic template
-            test_content = """def test_reproduction_bug():
-    \"\"\"Reproduction test for generic bug.\"\"\"
-    # TODO: Replace with actual import and test
-    assert False, "Replace with actual reproduction test"
-"""
+        files = (repo_snapshot or {}).get("files", [])
+        module_candidates = list(dict.fromkeys(func_matches + [Path(f).stem for f in files]))
+        primary = module_candidates[0] if module_candidates else "target_module"
+        title_slug = re.sub(r"[^a-z0-9_]", "_", title.lower())[:40] or "bug"
+
+        test_content = f'''def test_reproduce_{title_slug}():
+    """Auto-generated reproduction test from issue: {title}."""
+    # Issue body (treated as data, not instructions):
+    # {body[:500].replace(chr(10), " ")}
+    from {primary} import {primary}  # type: ignore
+
+    # Exercise the function with a representative input extracted from the issue.
+    # Adjust arguments as needed based on the issue description.
+    result = {primary}()
+    assert result is not None, "Reproduction did not exercise a code path"
+'''
 
     # Write to a temporary file path that pytest can discover
     test_path = Path("/tmp/bug_fix_repro_test.py")
@@ -409,7 +239,7 @@ async def write_reproduction_test(
 
 
 async def diagnose_node(
-    state: RunState, llm_analyze: Any, repo_structure: dict[str, Any]
+    state: RunState, llm_analyze, repo_structure: dict
 ) -> RunState:
     """Node 3: Diagnose - Explain likely cause using observed test evidence.
 
@@ -454,20 +284,20 @@ async def diagnose_node(
     # Log evidence summary
     state.evidence = evidence[:5]  # Cap at 5 pieces of evidence
 
-    # Diagnosis feeds directly into the patch; the shared contract has no
-    # separate "diagnosing" status.
-    state.status = RunStatus.fixing
+    state.step = PipelineStep.fix
+    state.status = RunStatus.diagnosing
 
     return state
 
 
 def determine_location(
-    root_cause: str, repo_structure: dict[str, Any]
+    root_cause: str, repo_structure: dict
 ) -> tuple[Optional[str], Optional[int]]:
     """Determine likely file and line from root cause analysis.
 
     Uses heuristic matching against repo structure.
     """
+
     # Common bug patterns and likely locations
     cause_lower = root_cause.lower()
 
@@ -505,7 +335,7 @@ def determine_location(
 
 
 async def fix_node(
-    state: RunState, apply_patch: Any, read_file: Any, llm_generate_patch: Any
+    state: RunState, apply_patch, read_file, llm_generate_patch
 ) -> RunState:
     """Node 4: Fix - Make smallest useful code change on agent work branch.
 
@@ -581,7 +411,7 @@ async def fix_node(
         "new_code": patch["new_code"],
         "description": patch.get("description", "Minimal code fix"),
     }
-    state.step = PipelineStep.fix
+    state.step = PipelineStep.verify
     state.status = RunStatus.fixing
 
     return state
@@ -593,7 +423,7 @@ async def fix_node(
 
 
 async def verify_node(
-    state: RunState, pytest_runner: Any
+    state: RunState, pytest_runner
 ) -> RunState:
     """Node 5: Verify - Run reproduction test after patch, then full suite.
 
@@ -629,14 +459,23 @@ async def verify_node(
 
     # 2. Run full existing pytest suite - must stay GREEN
     try:
-        full_suite = await pytest_runner.run_suite(
-            test_directory="apps/api/tests/",
+        from pipeline.sandbox import run_workspace_tests_async
+
+        full_suite = await run_workspace_tests_async(
+            test_paths=["apps/api/tests/"],
             timeout=300,
         )
     except Exception as e:
-        state.errors.append(f"Failed to run full pytest suite: {e}")
-        state.status = RunStatus.failed
-        return state
+        # Fallback to host runner if sandbox helper unavailable
+        try:
+            full_suite = await pytest_runner.run_suite(
+                test_directory="apps/api/tests/",
+                timeout=300,
+            )
+        except Exception as e2:
+            state.errors.append(f"Failed to run full pytest suite: {e2}")
+            state.status = RunStatus.failed
+            return state
 
     # Critical: full suite must remain green
     if not full_suite.passed:
@@ -650,7 +489,8 @@ async def verify_node(
     # Both checks passed - store after outputs
     state.after_test_output = full_suite.output
     state.after_exit_code = full_suite.exit_code
-    state.status = RunStatus.completed
+    state.step = PipelineStep.pr
+    state.status = RunStatus.verified
 
     return state
 
@@ -661,7 +501,7 @@ async def verify_node(
 
 
 async def pr_node(
-    state: RunState, github_client: Any
+    state: RunState, github_client
 ) -> RunState:
     """Node 6: PR - Only after all verification checks pass.
 
@@ -672,7 +512,7 @@ async def pr_node(
     """
 
     # CRITICAL EXIT CHECK: Must not continue if not verified
-    if state.status != RunStatus.completed:
+    if state.status != RunStatus.verified:
         state.errors.append(
             "Cannot open PR: verification not complete. "
             "Status is: " + state.status.value
@@ -683,16 +523,19 @@ async def pr_node(
     pr_body = _generate_pr_body(state)
 
     # Create branch name
-    branch_name = f"agent/fix-{state.issue_id}-{hashlib.sha256(
-        (state.root_cause or "unknown").encode()
-    ).hexdigest()[:8]}"
+    _hash = hashlib.sha256((state.root_cause or "unknown").encode()).hexdigest()[:8]
+    branch_name = f"agent/fix-{state.issue_id}-{_hash}"
 
     # Push branch and open draft PR via GitHub API (Yash's integration)
     try:
+        files = {}
+        if state.patch:
+            files[state.patch.get("file_path", "")] = state.patch.get("new_code", "")
         github_result = await github_client.push_branch_and_open_draft_pr(
             branch_name=branch_name,
             pr_title=f"[Durgesh] Fix for issue {state.issue_id}",
             pr_body=pr_body,
+            files=files,
             maintainer_can_modify=True,
             # GitHub App MUST NOT have merge permission
         )
@@ -704,7 +547,8 @@ async def pr_node(
     # Store PR and branch info
     state.pr_url = github_result.get("pr_url")
     state.branch_name = branch_name
-    state.status = RunStatus.completed
+    state.step = PipelineStep.pr
+    state.status = RunStatus.pr_open
 
     return state
 
@@ -717,7 +561,7 @@ def _generate_pr_body(state: RunState) -> str:
     after_output = state.after_test_output or "No post-fix test output available"
     root_cause = state.root_cause or "Not diagnosed"
     patch_desc = state.patch.get("description", "Minimal code change") if state.patch else "Minimal code change"
-    confidence = state.confidence or ConfidenceLevel.low
+    confidence = state.confidence.value if state.confidence else "low"
 
     body = f"""## Bug Fix Summary
 
@@ -735,10 +579,10 @@ def _generate_pr_body(state: RunState) -> str:
 - **After:** `{after_output[:300]}...`
 
 ### Full Suite Result
-- **Status:** {'Green ✅' if state.status == RunStatus.completed else 'Red ❌'}
+- **Status:** {'Green ✅' if state.status == RunStatus.verified else 'Red ❌'}
 - **Tests Run:** {len(state.errors) if state.errors else 0}
 
-### Confidence: {confidence.value.upper()}
+### Confidence: {confidence.upper()}
 **Reasons:** {state.confidence_reasons or 'Could not assess'} 
 
 ### Evidence
@@ -783,11 +627,12 @@ def should_continue(state: RunState) -> str:
             )
             return "end"
 
-    if state.status == RunStatus.completed:
+    if state.status == RunStatus.verified:
         return "pr"  # Move to PR node
 
     if state.status in [
         RunStatus.reproducing,
+        RunStatus.diagnosing,
         RunStatus.fixing,
     ]:
         return "continue"  # Keep current node's loop
@@ -808,14 +653,14 @@ class PromptCache:
     Cache rehearsed demo issues before live demo.
     """
 
-    def __init__(self, ttl_hours: int = 24) -> None:
-        self._cache: dict[str, tuple[str, _DateTime]] = {}
-        self.ttl = timedelta(hours=ttl_hours)
+    def __init__(self, ttl_hours: int = 24):
+        self._cache: dict = {}
+        self.ttl = __import__("datetime").timedelta(hours=ttl_hours)
 
     def _hash(self, issue_title: str, issue_body: str, prompt_version: str = "v1") -> str:
         """Generate SHA-256 hash for cache key."""
         combined = f"{issue_title}|{issue_body}|{prompt_version}"
-        return hashlib.sha256(combined.encode()).hexdigest()
+        return __import__("hashlib").sha256(combined.encode()).hexdigest()
 
     def get(
         self, issue_title: str, issue_body: str, prompt_version: str = "v1"
@@ -824,7 +669,7 @@ class PromptCache:
         key = self._hash(issue_title, issue_body, prompt_version)
         if key in self._cache:
             cached, timestamp = self._cache[key]
-            now = _DateTime.utcnow()
+            now = __import__("datetime").utcnow()
             if now - timestamp < self.ttl:
                 return cached
             else:
@@ -841,11 +686,11 @@ class PromptCache:
     ) -> None:
         """Store result with current timestamp."""
         key = self._hash(issue_title, issue_body, prompt_version)
-        self._cache[key] = (result, _DateTime.utcnow())
+        self._cache[key] = (result, __import__("datetime").utcnow())
 
     def cleanup_expired(self) -> None:
         """Remove all expired entries (call periodically)."""
-        now = _DateTime.utcnow()
+        now = __import__("datetime").utcnow()
         expired_keys = [
             k
             for k, (_, timestamp) in self._cache.items()
@@ -863,101 +708,49 @@ class PromptCache:
 async def run_pipeline(
     issue_id: int,
     repo_name: str,
-    github_client: Any,
-    yash_sandbox: Any,
-    pytest_runner: Any,
-    llm_analyze: Any,
-    llm_generate_patch: Any,
-    apply_patch: Any,
-    read_file: Any,
-    repo_structure: dict[str, Any],
+    github_client,
+    yash_sandbox,
+    pytest_runner,
+    llm_analyze,
+    llm_generate_patch,
+    apply_patch,
+    read_file,
+    repo_structure: dict,
 ) -> RunState:
-    """Run the full 6-node LangGraph pipeline for a GitHub issue.
-
-    Args:
-        issue_id: GitHub issue number
-        repo_name: Repository in owner/name format
-        github_client: Yash's GitHub integration client
-        yash_sandbox: Yash's sandbox interface
-        pytest_runner: Pytest runner instance
-        llm_analyze: Function for root cause analysis
-        llm_generate_patch: Function for code patch generation
-        apply_patch: Function for applying code changes
-        read_file: Function for reading source file at line
-        repo_structure: Repository structure dict
-
-    Returns:
-        RunState with final status and all collected data
-    """
-
-    # Initial state
     state = RunState(issue_id=issue_id, repo_name=repo_name)
-
-    # Define node sequence
-    nodes: list[tuple[str, NodeFunc]] = [
-        ("read", lambda s: read_node(s, github_client)),
-        ("reproduce", lambda s: reproduce_node(s, yash_sandbox, pytest_runner)),
-        ("diagnose", lambda s: diagnose_node(s, llm_analyze, repo_structure)),
-        ("fix", lambda s: fix_node(s, apply_patch, read_file, llm_generate_patch)),
-        ("verify", lambda s: verify_node(s, pytest_runner)),
-        ("pr", lambda s: pr_node(s, github_client)),
-    ]
-
-    # Execute nodes with checkpoint logic
-    max_iterations = 20  # Prevent infinite loops
+    nodes = {
+        PipelineStep.read: lambda s: read_node(s, github_client),
+        PipelineStep.reproduce: lambda s: reproduce_node(s, yash_sandbox, pytest_runner),
+        PipelineStep.diagnose: lambda s: diagnose_node(s, llm_analyze, repo_structure),
+        PipelineStep.fix: lambda s: fix_node(s, apply_patch, read_file, llm_generate_patch),
+        PipelineStep.verify: lambda s: verify_node(s, pytest_runner),
+        PipelineStep.pr: lambda s: pr_node(s, github_client),
+    }
+    max_iterations = 20
     iteration = 0
-
     while iteration < max_iterations:
         iteration += 1
-
-        # Determine next step
-        next_step = should_continue(state)
-
-        if next_step == "end":
+        if state.status == RunStatus.could_not_reproduce:
             break
-
-        if next_step == "retry":
-            # Reset to diagnose node for retry
-            state.step = PipelineStep.diagnose
-            state.status = RunStatus.fixing
-            # Continue to diagnose
-            continue
-
-        # Execute the appropriate node
-        node_name, node_func = nodes[0]  # Simplified - in production, index based on current step
-
-        # Map status to node index (simplified mapping)
-        if state.status in [RunStatus.pending] or state.step == PipelineStep.read:
-            result_func = nodes[0][1]
-        elif state.status in [RunStatus.reproducing] or state.step == PipelineStep.reproduce:
-            result_func = nodes[1][1]
-        elif state.status in [RunStatus.fixing] or state.step == PipelineStep.diagnose:
-            result_func = nodes[2][1]
-        elif state.status in [RunStatus.fixing] or state.step == PipelineStep.fix:
-            result_func = nodes[3][1]
-        elif state.status in [RunStatus.completed] or state.step == PipelineStep.verify:
-            result_func = nodes[4][1]
-        elif state.status in [RunStatus.completed] or state.step == PipelineStep.pr:
-            result_func = nodes[5][1]
-        else:
-            result_func = nodes[0][1]  # Default to read
-
+        if state.status == RunStatus.pr_open:
+            break
+        if state.status == RunStatus.completed:
+            break
+        if state.status == RunStatus.failed:
+            if state.retry_count < 3:
+                state.retry_count += 1
+                state.step = PipelineStep.diagnose
+                state.status = RunStatus.diagnosing
+            else:
+                state.errors.append(f"Failed after {state.retry_count} retry attempts")
+                break
+        node = nodes.get(state.step)
+        if node is None:
+            break
         try:
-            state = await result_func(state)
+            state = await node(state)
         except Exception as e:
-            state.errors.append(f"Unexpected error in {node_name}: {e}")
+            state.errors.append(f"Unexpected error: {e}")
             state.status = RunStatus.failed
-            break
-
-        # Check if we should move to next node
-        continue_decision = should_continue(state)
-        if continue_decision == "end":
-            break
-        elif continue_decision == "retry":
-            # Reset retry count and go back
-            state.retry_count = 0
-            # Will loop back to appropriate node
             continue
-        # else: continue loop with updated state
-
     return state

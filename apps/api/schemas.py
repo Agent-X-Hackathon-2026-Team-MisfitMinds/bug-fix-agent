@@ -15,10 +15,6 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _iso_now() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-
-
 class RunStatus(str, Enum):
     pending = "pending"
     reproducing = "reproducing"
@@ -156,8 +152,9 @@ class RunState(BaseModel):
 
     # Identification
     run_id: str = Field(
-        default_factory=lambda: f"run-{uuid4().hex[:12]}",
-        description="Pipeline-scoped run id; the API's Run.id is a UUID",
+        default_factory=lambda: "run-" + __import__("hashlib").sha256(
+            str(__import__("uuid").uuid4()).encode()
+        ).hexdigest()[:12]
     )
     issue_id: int = Field(..., description="GitHub issue number")
     repo_name: str = Field(..., description="Repository in owner/name format")
@@ -199,9 +196,21 @@ class RunState(BaseModel):
         default=None,
         description="Test output before the fix was applied",
     )
+    before_output: Optional[str] = Field(
+        default=None,
+        description="Alias for baseline test output",
+    )
     before_exit_code: Optional[int] = Field(
         default=None,
         description="Exit code before the fix",
+    )
+    reproduction_test_code: Optional[str] = Field(
+        default=None,
+        description="Generated reproduction test code",
+    )
+    confidence_reasons: list[str] = Field(
+        default_factory=list,
+        description="Reasons for confidence level",
     )
 
     # After Fix Evidence
@@ -251,6 +260,10 @@ class RunState(BaseModel):
         default=None,
         description="Git branch name where patch was applied",
     )
+    comment: Optional[str] = Field(
+        default=None,
+        description="Comment to post on the issue",
+    )
 
     # Metadata
     retry_count: int = Field(
@@ -258,10 +271,11 @@ class RunState(BaseModel):
         description="Number of retry attempts for this run",
     )
     created_at: str = Field(
-        default_factory=_iso_now,
+        default_factory=lambda: __import__('datetime').datetime.utcnow().isoformat()
+        + "Z",
         description="ISO timestamp when run was created",
     )
     updated_at: str = Field(
-        default_factory=_iso_now,
+        default_factory=lambda: __import__('datetime').utcnow().isoformat() + "Z",
         description="ISO timestamp when run was last updated",
     )

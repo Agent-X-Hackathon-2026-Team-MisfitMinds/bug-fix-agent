@@ -49,6 +49,8 @@ class Settings(BaseSettings):
         default="http://localhost:3000",
         validation_alias=AliasChoices("WEB_ORIGIN", "NEXT_PUBLIC_APP_URL", "NEXT_PUBLIC_SITE_URL"),
     )
+    gemini_api_key: str = Field(default="", validation_alias=AliasChoices("GEMINI_API_KEY"))
+    gemini_model: str = Field(default="gemini-2.0-flash", validation_alias=AliasChoices("GEMINI_MODEL"))
     cookie_secure: bool = True
     session_ttl_seconds: int = 86400
     oauth_state_ttl_seconds: int = 600
