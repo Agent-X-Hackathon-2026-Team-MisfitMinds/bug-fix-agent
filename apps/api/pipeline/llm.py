@@ -9,11 +9,12 @@ Cache rehearsed demo issues before the live demo.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
-import json
 import time
-import os
 from typing import Dict, List, Optional
+
+from config import get_settings
 
 try:
     import google.generativeai as genai
@@ -35,24 +36,28 @@ class PromptCache:
     Uses 24-hour TTL; invalidate on prompt changes.
     Cache rehearsed demo issues before the live demo.
 
-    Cache key = SHA-256(issue_title + issue_body + prompt_version)
+    Cache key = SHA-256(issue_title + issue_body + prompt_version + prompt)
     """
 
     def __init__(self, ttl_hours: int = 24):
         self._cache: Dict[str, tuple[str, float]] = {}
         self.ttl = ttl_hours * 3600  # Convert to seconds
 
-    def _hash(self, issue_title: str, issue_body: str, prompt_version: str = "v1") -> str:
+    def _hash(
+        self, issue_title: str, issue_body: str, prompt_version: str = "v1", prompt: str = ""
+    ) -> str:
         """Generate SHA-256 hash for cache key."""
-        combined = f"{issue_title}|{issue_body}|{prompt_version}"
+        combined = f"{issue_title}|{issue_body}|{prompt_version}|{prompt}"
         return hashlib.sha256(combined.encode()).hexdigest()
 
-    def get(self, issue_title: str, issue_body: str, prompt_version: str = "v1") -> Optional[str]:
+    def get(
+        self, issue_title: str, issue_body: str, prompt_version: str = "v1", prompt: str = ""
+    ) -> Optional[str]:
         """Retrieve cached result if not expired.
 
         Returns cached result or None if not found/expired.
         """
-        key = self._hash(issue_title, issue_body, prompt_version)
+        key = self._hash(issue_title, issue_body, prompt_version, prompt)
         if key in self._cache:
             cached_result, timestamp = self._cache[key]
             elapsed = time.time() - timestamp
@@ -63,9 +68,16 @@ class PromptCache:
                 del self._cache[key]
         return None
 
-    def set(self, issue_title: str, issue_body: str, prompt_version: str = "v1", result: str = "") -> None:
+    def set(
+        self,
+        issue_title: str,
+        issue_body: str,
+        prompt_version: str = "v1",
+        result: str = "",
+        prompt: str = "",
+    ) -> None:
         """Store result with current timestamp."""
-        key = self._hash(issue_title, issue_body, prompt_version)
+        key = self._hash(issue_title, issue_body, prompt_version, prompt)
         self._cache[key] = (result, time.time())
 
     def cleanup(self) -> None:
@@ -93,16 +105,16 @@ class LLMWrapper:
         cache: Optional[PromptCache] = None,
     ):
         self.provider = provider
-        self.api_key = api_key or os.environ.get("GEMINI_API_KEY", "")
+        settings = get_settings()
+        self.api_key = api_key or settings.gemini_api_key.get_secret_value()
+        self.model_name = settings.gemini_model
         self.cache = cache or PromptCache()
         self._rate_limit_time: float = 0.0
         self._rate_limit_seconds = 60  # Default 60s cooldown
 
         # Initialize the provider
-        if self.api_key:
-            if self.provider == "gemini":
-                genai.configure(api_key=self.api_key)
-            # Groq would be initialized here
+        if self.api_key and genai is not None and self.provider == "gemini":
+            genai.configure(api_key=self.api_key)
 
     def _check_rate_limit(self) -> bool:
         """Check if enough time has passed since last rate limit hit.
@@ -144,7 +156,7 @@ class LLMWrapper:
             RateLimitError: If rate limited and max retries exceeded
         """
         # Step 1: Check cache
-        cached = self.cache.get(issue_title, issue_body, prompt_version)
+        cached = self.cache.get(issue_title, issue_body, prompt_version, prompt)
         if cached and not force_cache:
             return cached
 
@@ -166,21 +178,15 @@ class LLMWrapper:
             raise
 
         # Step 4: Cache the result
-        self.cache.set(issue_title, issue_body, prompt_version, response)
-
-        # If node_name is provided, also cache with "rehearsed" version for future use
-        # and optionally prepend template-based guidance
-        if node_name and node_name in PROMPT_TEMPLATES:
-            # Could prepend template guidance, but for now just cache
-            pass
-
+        self.cache.set(issue_title, issue_body, prompt_version, response, prompt)
         return response
 
     async def _call_provider(self, prompt: str) -> str:
         """Call the LLM provider with the given prompt.
 
         Uses Gemini (Google Generative AI) by default.
-        Falls back to a mock response if API key is not available.
+        Raises instead of inventing an answer when the key, the SDK or the
+        provider is unavailable.
 
         Args:
             prompt: The prompt to send to the LLM
@@ -191,111 +197,40 @@ class LLMWrapper:
         Raises:
             RateLimitError: If rate limited by provider
         """
-        if not self.api_key or genai is None:
-            # No API key or dependency available - return mock response for development
-            return self._mock_llm_response(prompt)
+        if genai is None:
+            raise RuntimeError("google-generativeai is not installed; cannot call the LLM")
+        if not self.api_key:
+            raise RuntimeError("LLM API key is not configured (GEMINI_API_KEY)")
 
         try:
-            model = genai.GenerativeModel(
-                model_name="gemini-1.5-flash"
-            )
-
-            # Safety settings to allow reasonable content
-            safety_settings = [
-                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_MEDIUM_AND_ABOVER"},
-                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-            ]
-
-            response = model.generate_content(
-                prompt,
-                safety_settings=safety_settings,
-            )
-
-            text: str = response.text
-            if text:
-                return text
-            else:
-                return self._mock_llm_response(prompt)
-
+            model = genai.GenerativeModel(model_name=self.model_name)
+            response = await asyncio.to_thread(model.generate_content, prompt)
+            text = str(response.text or "")
         except Exception as e:
             error_msg = str(e).lower()
             if "rate limit" in error_msg or "429" in error_msg:
                 self._enforce_rate_limit()
                 raise RateLimitError(retry_after=60) from e
-            # If API key is invalid or other config issue, fall back to mock
-            if "invalid" in error_msg or "authentication" in error_msg:
-                return self._mock_llm_response(prompt)
-            # For any other error, return mock for development
-            return self._mock_llm_response(prompt)
-
-    def _mock_llm_response(self, prompt: str) -> str:
-        """Generate a mock LLM response for development/testing.
-
-        This is used when no API key is available or API calls fail.
-        In production, this should be replaced with actual API calls.
-
-        The mock response is structured to be useful for the bug-fix-agent
-        pipeline nodes (read, reproduce, diagnose, fix, verify, pr).
-        """
-        prompt_lower = prompt.lower()
-
-        # Determine response based on prompt content
-        if "root cause" in prompt_lower or "diagnose" in prompt_lower:
-            return json.dumps({
-                "root_cause": "Off-by-one error in calculation due to incorrect formula",
-                "evidence": [
-                    "Test output shows unexpected result",
-                    "Formula does not match expected mathematical operation"
-                ],
-                "confidence": "medium"
-            })
-        elif "patch" in prompt_lower or "fix" in prompt_lower:
-            return json.dumps({
-                "patch": {
-                    "file_path": "apps/api/demo_bugs/calculations/calculations.py",
-                    "old_code": "discount = price * (discount_percent / 100)\nreturn price - discount + 1",
-                    "new_code": "discount = price * (1 - discount_percent / 100)\nreturn price - discount",
-                    "description": "Fix off-by-one in discount calculation"
-                },
-                "confidence": "high",
-                "description": "Minimal patch to fix off-by-one bug"
-            })
-        elif "reproduce" in prompt_lower:
-            return json.dumps({
-                "reproduction_steps": "Run the calculation with known inputs and compare against expected output",
-                "test_needed": "Write a pytest test that asserts the correct discount formula",
-                "confidence": "high"
-            })
-        elif "issue" in prompt_lower:
-            return json.dumps({
-                "issue_analysis": "Issue describes a bug in Python code that needs fixing",
-                "expected_behavior": "Code should produce correct output per mathematical expectations",
-                "actual_behavior": "Code produces incorrect output due to bug",
-                "confidence": "medium"
-            })
-        else:
-            # Generic helpful mock response
-            return json.dumps({
-                "analysis": "Prompt analyzed for bug-fix-agent pipeline",
-                "next_steps": "Proceed with diagnosis and patch generation",
-                "confidence": "low",
-                "note": "Mock response - configure GEMINI_API_KEY for real LLM calls"
-            })
+            raise
+        if not text:
+            raise RuntimeError("LLM returned an empty response")
+        return text
 
     def cache_rehearsed_issues(self, rehearsed_issues: List[dict[str, str]]) -> None:
         """Pre-cache results for demo/rehearsal issues before live demo.
 
         Args:
-            rehearsed_issues: List of dicts with 'title', 'body', and expected 'response'
+            rehearsed_issues: List of dicts with 'title', 'body', 'prompt' and
+                'expected_response'. The prompt is part of the cache key, so an
+                entry without the exact prompt would never be read back.
         """
         for issue_data in rehearsed_issues:
             title = issue_data.get("title", "")
             body = issue_data.get("body", "")
+            prompt = issue_data.get("prompt", "")
             expected = issue_data.get("expected_response", "")
-            if title and body:
-                self.cache.set(title, body, prompt_version="rehearsed", result=expected)
+            if title and body and prompt:
+                self.cache.set(title, body, result=expected, prompt=prompt)
 
 
 # Default instance for use across the project
