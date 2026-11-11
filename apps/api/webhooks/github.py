@@ -10,6 +10,7 @@ from config import get_settings
 from data.run_repo import RunRepo
 from data.webhook_repo import DeliveryStore
 from errors import AppError, ConflictError, Unauthorized, ValidationFailed
+from pipeline.queue import enqueue_run
 from rate_limit import rate_limit
 from schemas import GitHubWebhookPayload
 
@@ -102,8 +103,6 @@ async def github_webhook(request: Request) -> dict[str, str]:
 
     if fields is not None:
         run = _get_repo(request).create(**fields)
-        queue = getattr(request.app.state, "pipeline_queue", None)
-        if callable(queue):
-            queue(run.id)
+        enqueue_run(getattr(request.app.state, "pipeline_queue", None), run.id)
 
     return {"status": "accepted", "delivery_id": delivery_id}

@@ -15,6 +15,10 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _iso_now() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 class RunStatus(str, Enum):
     pending = "pending"
     reproducing = "reproducing"
@@ -152,9 +156,8 @@ class RunState(BaseModel):
 
     # Identification
     run_id: str = Field(
-        default_factory=lambda: f"run-{__import__('hashlib').sha256(
-            __import__('uuid').uuid4().encode
-        ).hexdigest()[:12]}"
+        default_factory=lambda: f"run-{uuid4().hex[:12]}",
+        description="Pipeline-scoped run id; the API's Run.id is a UUID",
     )
     issue_id: int = Field(..., description="GitHub issue number")
     repo_name: str = Field(..., description="Repository in owner/name format")
@@ -255,11 +258,10 @@ class RunState(BaseModel):
         description="Number of retry attempts for this run",
     )
     created_at: str = Field(
-        default_factory=lambda: __import__('datetime').datetime.utcnow().isoformat()
-        + "Z",
+        default_factory=_iso_now,
         description="ISO timestamp when run was created",
     )
     updated_at: str = Field(
-        default_factory=lambda: __import__('datetime').utcnow().isoformat() + "Z",
+        default_factory=_iso_now,
         description="ISO timestamp when run was last updated",
     )

@@ -13,6 +13,7 @@ from auth.sessions import Session
 from data.idempotency import IdempotencyStore
 from data.run_repo import Caller, RunRepo
 from errors import ConflictError, ValidationFailed
+from pipeline.queue import enqueue_run
 from rate_limit import rate_limit
 from schemas import (
     ListRunsParams,
@@ -143,6 +144,7 @@ async def retry_run(
 
     run = repo.check_retryable(caller, run_id)
     repo.reset_for_retry(run.id)
+    enqueue_run(getattr(request.app.state, "pipeline_queue", None), run.id)
     retry = RetryResponse(run_id=run.id)
     store.put(key, run.id, retry.model_dump(mode="json"))
     return retry

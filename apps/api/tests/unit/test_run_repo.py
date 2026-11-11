@@ -4,7 +4,7 @@ import pytest
 
 from data.run_repo import Caller, RunRepo, decode_cursor
 from errors import ConflictError, NotFoundError, ValidationFailed
-from schemas import Run, RunStatus
+from schemas import PipelineStep, Run, RunStatus, RunStep, StepStatus
 
 
 def make(repo: RunRepo, login: str = "alice", inst: int = 1, n: int = 1) -> Run:
@@ -71,3 +71,40 @@ def test_retry_only_failed_states() -> None:
 def test_bad_cursor() -> None:
     with pytest.raises(ValidationFailed):
         decode_cursor("!!!")
+
+
+def test_worker_can_read_a_run_without_an_http_caller() -> None:
+    repo = RunRepo()
+    run = make(repo)
+
+    assert repo.get_by_id(run.id).id == run.id
+    assert repo.get_steps_by_id(run.id) == []
+
+    with pytest.raises(NotFoundError):
+        repo.get_by_id(uuid4())
+
+
+def test_update_step_moves_running_to_completed_in_place() -> None:
+    repo = RunRepo()
+    run = make(repo)
+    step = RunStep(run_id=run.id, step=PipelineStep.reproduce, status=StepStatus.running)
+    repo.add_step(step)
+
+    updated = repo.update_step(
+        step.model_copy(update={"status": StepStatus.completed, "output": "1 failed"})
+    )
+
+    steps = repo.get_steps(Caller(1, "alice"), run.id)
+    assert len(steps) == 1
+    assert steps[0].id == updated.id
+    assert steps[0].status == StepStatus.completed
+    assert steps[0].output == "1 failed"
+
+
+def test_update_step_appends_an_unknown_step() -> None:
+    repo = RunRepo()
+    run = make(repo)
+
+    repo.update_step(RunStep(run_id=run.id, step=PipelineStep.read, status=StepStatus.completed))
+
+    assert [step.step for step in repo.get_steps_by_id(run.id)] == [PipelineStep.read]

@@ -13,9 +13,7 @@ does the work and streams progress over SSE; a Next.js dashboard shows each run.
   sandbox runner, security headers, rate limiting, and the API CI gates.
 - **Frontend — available in `apps/web`.** The demo workspace uses example data;
   live backend sign-in, run data, retry and SSE still require integration testing.
-- **Pipeline — not wired.** The webhook creates a run and calls
-  `app.state.pipeline_queue`, which is still `None`; nothing processes runs until
-  the agent graph is connected.
+- **Pipeline status:** Queue and sandbox changes are present; end-to-end execution still needs verification.
 
 ## Layout
 

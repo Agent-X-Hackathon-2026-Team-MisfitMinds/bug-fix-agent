@@ -1,7 +1,7 @@
 ﻿import pytest
 from pydantic import ValidationError
 
-from schemas import ListRunsParams, RunStatus
+from schemas import ListRunsParams, RunState, RunStatus
 
 
 def test_defaults() -> None:
@@ -24,3 +24,13 @@ def test_status_values() -> None:
     assert {s.value for s in RunStatus} == {
         "pending", "reproducing", "fixing", "verifying",
         "completed", "failed", "could_not_reproduce"}
+
+
+def test_run_state_has_working_id_and_timestamp_defaults() -> None:
+    state = RunState(issue_id=1, repo_name="octo/demo")
+
+    assert state.run_id.startswith("run-")
+    assert len(state.run_id) == 16
+    assert state.created_at.endswith("Z")
+    assert state.updated_at.endswith("Z")
+    assert state.status == RunStatus.pending
