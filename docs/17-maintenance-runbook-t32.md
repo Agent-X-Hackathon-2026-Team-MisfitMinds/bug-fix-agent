@@ -12,7 +12,7 @@
 |------|-------|---------------|-----|
 | Dependency updates (npm + pip) | Subhi / Yash | `npm audit` + `pip audit` zero High/Critical | Monthly |
 | Security audit | Yash | Security headers scan passes | Monthly |
-| Lighthouse re-check | Subhi | SEO ≥ 95 on all public routes | Monthly |
+| Lighthouse re-check | Subhi | Mobile score ≥ 90 on app routes (budget in `docs/05-architecture.md`) | Monthly |
 | Cost review | You | ₹0 budget maintained (free tiers only) | Monthly |
 | Secrets rotation review | Yash | No secrets in `NEXT_PUBLIC_*`, `.env` git-ignored | Monthly |
 
@@ -44,11 +44,8 @@
 - .env git-ignored: [verified]
 
 ## 3. Lighthouse re-check
-- SEO score on /: [score ≥ 95]
-- SEO score on /how-it-works: [score ≥ 95]
-- SEO score on /demo: [score ≥ 95]
-- SEO score on /security: [score ≥ 95]
-- SEO score on /pricing: [score ≥ 95]
+- Mobile score on /login: [score ≥ 90]
+- Mobile score on /dashboard: [score ≥ 90]
 
 ## 4. Cost review
 - Monthly spend: ₹0 (free tiers only)
