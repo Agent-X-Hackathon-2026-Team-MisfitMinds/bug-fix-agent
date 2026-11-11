@@ -25,6 +25,22 @@ class Settings(BaseSettings):
         default=SecretStr(""),
         validation_alias=AliasChoices("GITHUB_APP_WEBHOOK_SECRET", "GITHUB_WEBHOOK_SECRET"),
     )
+    github_app_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("GITHUB_APP_ID"),
+    )
+    github_app_private_key: SecretStr = Field(
+        default=SecretStr(""),
+        validation_alias=AliasChoices("GITHUB_APP_PRIVATE_KEY"),
+    )
+    github_installation_id: int = Field(
+        default=0,
+        validation_alias=AliasChoices("GITHUB_INSTALLATION_ID"),
+    )
+    github_repository: str = Field(
+        default="",
+        validation_alias=AliasChoices("GITHUB_DEMO_REPO"),
+    )
     api_base_url: str = Field(
         default="http://localhost:8000",
         validation_alias=AliasChoices("API_BASE_URL", "NEXT_PUBLIC_API_URL"),
