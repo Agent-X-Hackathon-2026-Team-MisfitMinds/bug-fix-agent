@@ -11,11 +11,11 @@
 Backup target: `apps/api/data/` directory (JSON run files, sessions, LLM cache, webhook events)
 
 ```powershell
-# Create backup tarball
-Compress-Archive -Path "apps/api/data/*" -DestinationPath "backup-$(Get-Date -Format 'yyyyMMdd-HHmmss').tar.gz"
+# Create backup tarball (tar ships with Windows 10+; Compress-Archive would write a zip)
+tar -czf "backup-$(Get-Date -Format 'yyyyMMdd-HHmmss').tar.gz" -C apps/api data
 
-# Verify backup contents
-tar -tzf backup-*.tar.gz
+# Verify backup contents (tar.exe does not expand wildcards in PowerShell)
+tar -tzf (Get-ChildItem backup-*.tar.gz | Select-Object -Last 1).FullName
 ```
 
 ## Restore drill (< 10 minutes)
