@@ -71,3 +71,6 @@
 
 /* Neutral states must not look like a successful run. */
 .badge.ui-status-neutral{background:var(--ds-elev);color:var(--ds-text-primary)}
+
+/* Switch theme colours together; avoid low-contrast intermediate button colours. */
+.theme-changing *, .theme-changing *::before, .theme-changing *::after{transition:none!important}

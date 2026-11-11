@@ -30,6 +30,6 @@ test('reusable empty state passes automated axe checks in light and dark modes',
   for(const theme of ['light','dark']){
     if(theme==='dark')await page.getByRole('button',{name:'Dark appearance'}).click();
     await injectAxe(page);const violations=await getViolations(page,undefined,{axeOptions:{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21a','wcag21aa']}}});
-    expect(violations.map(v=>`${v.id}: ${v.nodes.length}`),theme).toEqual([]);
+    expect(violations.map(v=>`${v.id}: ${JSON.stringify(v.nodes.map(n=>({html:n.html,summary:n.failureSummary})))}`),theme).toEqual([]);
   }
 });
