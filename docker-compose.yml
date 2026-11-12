@@ -4,29 +4,78 @@ services:
     ports:
       - "8000:8000"
     volumes:
+      # Deliberate bind mount: /app/data holds the data package's Python modules
+      # and the run/webhook/idempotency storage; a named volume would shadow them.
       - ./apps/api/data:/app/data
+      # The sandbox creates sibling containers (tmpfs workspaces, no host binds),
+      # so the API only needs the Docker daemon socket, not Docker-in-Docker.
+      - /var/run/docker.sock:/var/run/docker.sock
+    # The API container runs as a non-root user; add the host's docker group so
+    # it may talk to the socket. Find yours with: stat -c '%g' /var/run/docker.sock
+    # (Docker Desktop usually works with the default; Linux VMs often need 999 or 998.)
+    group_add:
+      - "${DOCKER_GID:-999}"
     environment:
       - GITHUB_APP_ID=${GITHUB_APP_ID}
       - GITHUB_APP_CLIENT_ID=${GITHUB_APP_CLIENT_ID}
       - GITHUB_APP_CLIENT_SECRET=${GITHUB_APP_CLIENT_SECRET}
       - GITHUB_APP_PRIVATE_KEY=${GITHUB_APP_PRIVATE_KEY}
       - GITHUB_APP_WEBHOOK_SECRET=${GITHUB_APP_WEBHOOK_SECRET}
+      - GITHUB_INSTALLATION_ID=${GITHUB_INSTALLATION_ID}
+      - GITHUB_DEMO_REPO=${GITHUB_DEMO_REPO}
       - SESSION_SECRET=${SESSION_SECRET}
-      - COOKIE_SECURE=${COOKIE_SECURE}
+      - COOKIE_SECURE=${COOKIE_SECURE:-true}
       - API_BASE_URL=${API_BASE_URL}
       - WEB_ORIGIN=${WEB_ORIGIN}
-      - LLM_API_KEY=${LLM_API_KEY}
-      - LLM_BASE_URL=${LLM_BASE_URL}
+      # LLM_API_KEY is the legacy name; older .env files still work.
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-${LLM_API_KEY:-}}
+      - GEMINI_MODEL=${GEMINI_MODEL:-}
+      - GEMINI_FALLBACK_MODELS=${GEMINI_FALLBACK_MODELS:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   web:
     build:
       context: ./apps/web
       dockerfile: Dockerfile
+      # Next bakes rewrites at build time; the standalone server proxies
+      # /api, /auth/github, /auth/callback and /webhooks to this address.
+      args:
+        API_BACKEND_URL: http://api:8000
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_APP_URL=http://localhost:3000
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_APP_URL=${WEB_ORIGIN}
+      - NEXT_PUBLIC_API_URL=${API_BASE_URL}
       - NEXT_PUBLIC_GITHUB_APP_ID=${NEXT_PUBLIC_GITHUB_APP_ID}
     depends_on:
       - api
+    restart: unless-stopped
+
+  # Optional automatic-HTTPS reverse proxy for a real domain:
+  #   docker compose --profile tls up -d --build
+  # Requires SITE_DOMAIN in .env and DNS pointing at this host (ports 80/443 open).
+  caddy:
+    profiles: ["tls"]
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - SITE_DOMAIN=${SITE_DOMAIN:-}
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:
