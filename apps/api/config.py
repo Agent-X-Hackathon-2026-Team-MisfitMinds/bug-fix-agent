@@ -54,11 +54,13 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("GEMINI_API_KEY", "LLM_API_KEY"),
     )
     gemini_model: str = Field(
-        default="gemini-3.8-flash",
+        # Verified working for new-format (AQ.) API keys as of 2026-11; older
+        # models like gemini-2.5-flash are retired for new keys (404).
+        default="gemini-3.1-flash-lite",
         validation_alias=AliasChoices("GEMINI_MODEL"),
     )
     gemini_fallback_models: str = Field(
-        default="gemini-3.5-flash,gemini-2.5-flash",
+        default="gemini-3.8-flash,gemini-3.5-flash",
         validation_alias=AliasChoices("GEMINI_FALLBACK_MODELS"),
     )
     cookie_secure: bool = True

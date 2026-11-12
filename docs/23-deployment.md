@@ -109,4 +109,6 @@ Options A/B above remove both problems.
 | Webhook deliveries fail | GitHub App webhook URL points at a dead URL; update it to `<site>/webhooks/github` |
 | Runs fail with sandbox error | Sandbox image missing on the daemon - rebuild it (command above), or the API can't reach the socket - check `DOCKER_GID` |
 | `401` from Gemini on the first LLM step | Key invalid/rotated - update `GEMINI_API_KEY` and restart; failover only helps with per-model overload, not bad keys |
+| `404 ... no longer available to new users` on the first LLM step | The configured model is retired for new-format (AQ.) API keys. Set `GEMINI_MODEL` to a current model; check which ones your key can use: `curl -s "https://generativelanguage.googleapis.com/v1beta/models" -H "x-goog-api-key: $GEMINI_API_KEY"`. Known-good 2026-11: `gemini-3.1-flash-lite` (primary), `gemini-3.8-flash` / `gemini-3.5-flash` (fallbacks) |
+| `429 ... exceeded your current quota` mid-run | Free-tier per-model quota exhausted; the failover wrapper skips to the next model in `GEMINI_FALLBACK_MODELS`, so keep at least two live models configured |
 | Everything resets after a restart | Expected: sessions/runs are in-memory by design (ADR-006) |
