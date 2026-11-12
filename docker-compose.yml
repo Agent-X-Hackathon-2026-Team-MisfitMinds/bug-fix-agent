@@ -27,7 +27,8 @@ services:
       - COOKIE_SECURE=${COOKIE_SECURE:-true}
       - API_BASE_URL=${API_BASE_URL}
       - WEB_ORIGIN=${WEB_ORIGIN}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      # LLM_API_KEY is the legacy name; older .env files still work.
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-${LLM_API_KEY:-}}
       - GEMINI_MODEL=${GEMINI_MODEL:-}
       - GEMINI_FALLBACK_MODELS=${GEMINI_FALLBACK_MODELS:-}
     restart: unless-stopped

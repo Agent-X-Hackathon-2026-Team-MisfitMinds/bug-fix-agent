@@ -4,6 +4,7 @@
 # /webhooks to the API container, so the GitHub App needs only this domain.
 {$SITE_DOMAIN} {
 	# SSE run-status streams must arrive unbuffered.
-	flush_interval -1
-	reverse_proxy web:3000
+	reverse_proxy web:3000 {
+		flush_interval -1
+	}
 }
