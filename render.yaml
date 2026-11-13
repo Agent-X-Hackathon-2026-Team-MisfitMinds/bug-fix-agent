@@ -18,6 +18,12 @@ services:
         value: modal
       - key: COOKIE_SECURE
         value: "true"
+      # Models verified live with new-format (AQ.) API keys as of 2026-11; older
+      # defaults return 404/429 and every run then fails at Diagnose.
+      - key: GEMINI_MODEL
+        value: gemini-3.1-flash-lite
+      - key: GEMINI_FALLBACK_MODELS
+        value: gemini-3.8-flash,gemini-3.5-flash
       # Secrets and site URLs: entered in the Render dashboard, never committed.
       - key: MODAL_TOKEN_ID
         sync: false
