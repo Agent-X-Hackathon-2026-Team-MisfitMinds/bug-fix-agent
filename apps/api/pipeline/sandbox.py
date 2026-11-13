@@ -30,6 +30,8 @@ from pathlib import Path
 from typing import Any, cast
 from uuid import uuid4
 
+from config import get_settings
+
 SANDBOX_IMAGE = "bug-fix-agent-sandbox:latest"
 SANDBOX_USER = "nonroot"
 SANDBOX_UID = 10001
@@ -562,7 +564,22 @@ async def run_workspace_tests_async(
     install_dependencies: bool = True,
     test_paths: Sequence[str] = (),
 ) -> SandboxResult:
-    """`run_workspace_tests` without blocking the API event loop."""
+    """`run_workspace_tests` without blocking the API event loop.
+
+    ``SANDBOX_BACKEND=modal`` routes the run to a hosted sandbox for hosts that
+    have no Docker daemon; every pipeline test run passes through here.
+    """
+    if get_settings().sandbox_backend == "modal":
+        from pipeline.sandbox_modal import run_workspace_tests_modal
+
+        return await asyncio.to_thread(
+            run_workspace_tests_modal,
+            Path(workspace),
+            config,
+            container_name,
+            install_dependencies=install_dependencies,
+            test_paths=test_paths,
+        )
     return await asyncio.to_thread(
         run_workspace_tests,
         Path(workspace),

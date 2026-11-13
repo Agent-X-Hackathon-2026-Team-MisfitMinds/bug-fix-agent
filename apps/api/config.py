@@ -61,6 +61,8 @@ class Settings(BaseSettings):
         default="gemini-3.5-flash,gemini-2.5-flash",
         validation_alias=AliasChoices("GEMINI_FALLBACK_MODELS"),
     )
+    # "docker" (local daemon) or "modal" (hosted sandbox, for hosts without Docker).
+    sandbox_backend: str = "docker"
     cookie_secure: bool = True
     session_ttl_seconds: int = 86400
     oauth_state_ttl_seconds: int = 600
