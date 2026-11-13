@@ -1,0 +1,46 @@
+# Render Blueprint: the API only. The web app stays on Vercel and proxies to it
+# (set Vercel's API_BACKEND_URL to this service's URL). See docs/23-deployment.md.
+services:
+  - type: web
+    name: fixie-api
+    runtime: docker
+    plan: free
+    rootDir: apps/api
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: ./apps/api
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "8000"
+      # Render has no Docker daemon, so tests run in a hosted Modal sandbox.
+      - key: SANDBOX_BACKEND
+        value: modal
+      - key: COOKIE_SECURE
+        value: "true"
+      # Secrets and site URLs: entered in the Render dashboard, never committed.
+      - key: MODAL_TOKEN_ID
+        sync: false
+      - key: MODAL_TOKEN_SECRET
+        sync: false
+      - key: API_BASE_URL
+        sync: false
+      - key: WEB_ORIGIN
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GITHUB_APP_ID
+        sync: false
+      - key: GITHUB_APP_CLIENT_ID
+        sync: false
+      - key: GITHUB_APP_CLIENT_SECRET
+        sync: false
+      - key: GITHUB_APP_PRIVATE_KEY
+        sync: false
+      - key: GITHUB_APP_WEBHOOK_SECRET
+        sync: false
+      - key: GITHUB_INSTALLATION_ID
+        sync: false
+      - key: GITHUB_DEMO_REPO
+        sync: false

@@ -86,6 +86,27 @@ which rotate on every restart and once lost can never be re-registered).
 5. Same GitHub App + verification steps as Option A, with `API_BASE_URL` /
    `WEB_ORIGIN` = `https://app.example.com`.
 
+## Option C - Vercel + Render + Modal sandbox (free, no machine of your own)
+
+Render's free tier has no Docker daemon, so the API cannot spawn sandbox
+containers there. With `SANDBOX_BACKEND=modal` the tests run in a hosted Modal
+Sandbox instead (`apps/api/pipeline/sandbox_modal.py`); nothing else changes.
+
+1. Modal: create an account and a token (`MODAL_TOKEN_ID`, `MODAL_TOKEN_SECRET`).
+2. Render: **New > Blueprint**, pick this repo (it reads `render.yaml`), and fill
+   in the prompted values. `API_BASE_URL` and `WEB_ORIGIN` are both the public
+   site URL (the Vercel URL), not the `onrender.com` one.
+3. Vercel: set `API_BACKEND_URL=https://<service>.onrender.com` and redeploy
+   (rewrites are baked at build time).
+4. GitHub App: callback `<site>/auth/callback`, webhook `<site>/webhooks/github`.
+5. Point a free uptime monitor at `https://<service>.onrender.com/health` every
+   5 minutes. Free Render services sleep after 15 idle minutes and take longer
+   to wake than GitHub's 10-second webhook timeout.
+
+Trade-offs: the code under test runs on Modal's infrastructure (the sandbox
+receives only the repository files, never secrets); tests run as root inside the
+sandbox; and in-memory state still resets on every Render deploy or restart.
+
 ## Current interim setup (Vercel + quick tunnel)
 
 Right now the web runs on Vercel (`fixie-steel.vercel.app`) whose rewrites
