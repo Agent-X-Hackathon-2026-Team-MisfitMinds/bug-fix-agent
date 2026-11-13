@@ -6,8 +6,9 @@ services:
     runtime: docker
     plan: free
     rootDir: apps/api
-    dockerfilePath: ./apps/api/Dockerfile
-    dockerContext: ./apps/api
+    # Both paths are resolved relative to rootDir, not the repo root.
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     healthCheckPath: /health
     envVars:
       - key: PORT
