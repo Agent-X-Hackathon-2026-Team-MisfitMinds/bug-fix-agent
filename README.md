@@ -19,13 +19,13 @@ does the work and streams progress over SSE; a Next.js dashboard shows each run.
 
 ### System architecture
 
-[![Agent-Fix system architecture](docs/diagrams/architecture.png?v=dark)](docs/diagrams/architecture.html)
+[![Agent-Fix system architecture](docs/diagrams/architecture.webp)](docs/diagrams/architecture.html)
 
 *Interactive:* [architecture.html](docs/diagrams/architecture.html)
 
 ### Issue-to-PR workflow
 
-[![Agent-Fix issue-to-PR workflow](docs/diagrams/workflow.png?v=dark)](docs/diagrams/workflow.html)
+[![Agent-Fix issue-to-PR workflow](docs/diagrams/workflow.webp)](docs/diagrams/workflow.html)
 
 *Interactive:* [workflow.html](docs/diagrams/workflow.html)
 
