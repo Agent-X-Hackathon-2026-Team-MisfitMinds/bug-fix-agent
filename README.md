@@ -15,6 +15,20 @@ does the work and streams progress over SSE; a Next.js dashboard shows each run.
   live backend sign-in, run data, retry and SSE still require integration testing.
 - **Pipeline status:** Queue and sandbox changes are present; end-to-end execution still needs verification.
 
+## Architecture & workflow diagrams
+
+### System architecture
+
+[![Agent-Fix system architecture](docs/diagrams/architecture.png)](docs/diagrams/architecture.html)
+
+*Interactive:* [architecture.html](docs/diagrams/architecture.html)
+
+### Issue-to-PR workflow
+
+[![Agent-Fix issue-to-PR workflow](docs/diagrams/workflow.png)](docs/diagrams/workflow.html)
+
+*Interactive:* [workflow.html](docs/diagrams/workflow.html)
+
 ## Layout
 
 ```
